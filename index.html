@@ -57,16 +57,16 @@
       <button type="button" data-f="sat" aria-pressed="false">Satellites</button>
     </div>
     <p class="note center" id="radarNote">Center is straight up, the edge is the horizon. Tap a blip.</p>
-    <div class="compassRow">
-      <button class="btn small" id="compassBtn" type="button" hidden>Turn the radar with my phone</button>
-      <p class="note" id="compassNote"></p>
-    </div>
+    <p class="note center" id="compassNote"></p>
     <div class="quick" id="quick"></div>
 
     <section class="card" id="finder" hidden aria-live="polite">
       <div class="cardHead">
-        <div class="eyebrow" id="fKind"></div>
-        <h2 class="fname" id="fName"></h2>
+        <div>
+          <div class="eyebrow" id="fKind"></div>
+          <h2 class="fname" id="fName"></h2>
+        </div>
+        <button class="close" id="fClose" type="button" aria-label="Close">×</button>
       </div>
       <dl class="facts3">
         <dt>What it is</dt><dd id="fWhat"></dd>

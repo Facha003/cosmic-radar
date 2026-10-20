@@ -20,7 +20,7 @@ const hemi=()=>S.lat>=0?{name:"northern",dir:"north",az:0}:{name:"southern",dir:
 const Aurora={
   open:false,ov:null,ovTime:null,ovAt:0,near:null,nearKey:"",spots:null,spotsKey:"",spotsState:"",lastDraw:0,
   init(){
-    this.cv=$("auroraRadar");
+    this.cv=$("auroraRadar");watchOnScreen(this,this.cv);
     requestAnimationFrame(t=>this.frame(t));
   },
   show(){
@@ -108,24 +108,25 @@ const Aurora={
       <p class="fText">${esc(r.text)}</p>${r.meter!=null?`<div class="meter" aria-hidden="true"><span style="width:${Math.round(Math.max(.02,Math.min(1,r.meter))*100)}%"></span>${r.mark!=null?`<i style="left:${Math.round(r.mark*100)}%"></i>`:""}</div>`:""}</li>`).join("");
     // radar caption
     $("aRadarNote").textContent=!this.ov?(this.ovAt?"NOAA's aurora map couldn't load right now.":"Loading NOAA's aurora map…")
-      :`Green is where aurora is likely overhead (NOAA, ${fmt(this.ovTime)}). Inside the bright ring it can show low on your ${hm.dir}ern horizon.`+(this.near&&!this.near.some(p=>p.d<=RANGE_KM&&p.v>=10)?" None within range right now.":"");
+      :(Compass.heading!=null?"The top is the way your phone points. ":"")+`Green is where aurora is likely overhead (NOAA, ${fmt(this.ovTime)}). Inside the bright ring it can show low on your ${hm.dir}ern horizon.`+(this.near&&!this.near.some(p=>p.d<=RANGE_KM&&p.v>=10)?" None within range right now.":"");
     this.renderKp(ch);this.renderSpots();this.lastDraw=0;
   },
   frame(now){
     requestAnimationFrame(t=>this.frame(t));
-    if(document.hidden||$("paneAur").hidden)return;
+    if(document.hidden||$("paneAur").hidden||!this.onScreen)return;
     const still=reduceMotion();
-    if(still&&this.lastDraw)return;
+    if(still?this.lastDraw:now-this.lastDraw<FRAME_MS)return;
     this.lastDraw=now;this.draw(still?null:now);
   },
+  // Turns with the phone like the Cosmic Radar: the top is the way you face
   draw(now){
-    const {ctx,w}=sizeCanvas(this.cv),c=w/2,R=c-6,k=R/RANGE_KM;
-    const sweep=drawScope(ctx,w,R,{rot:0,now,rings:[{r:500*k,dash:true,label:"500 km"},{r:1000*k,strong:true,label:"1,000 km"},{r:1500*k,dash:true,label:"1,500 km"}]});
+    const {ctx,w}=sizeCanvas(this.cv),c=w/2,R=c-6,k=R/RANGE_KM,rot=Compass.heading||0;
+    const sweep=drawScope(ctx,w,R,{rot,now,rings:[{r:500*k,dash:true,label:"500 km"},{r:1000*k,strong:true,label:"1,000 km"},{r:1500*k,dash:true,label:"1,500 km"}]});
     if(this.near){
       ctx.save();ctx.beginPath();ctx.arc(c,c,R,0,TAU);ctx.clip();ctx.globalCompositeOperation="lighter";
       const cell=Math.max(3,70*k);
       for(const p of this.near){
-        const t=p.b*D2R,x=c+Math.sin(t)*p.d*k,y=c-Math.cos(t)*p.d*k,gl=afterglow(sweep,t),v=Math.min(1,p.v/35);
+        const t=(p.b-rot)*D2R,x=c+Math.sin(t)*p.d*k,y=c-Math.cos(t)*p.d*k,gl=afterglow(sweep,t),v=Math.min(1,p.v/35);
         ctx.fillStyle=`rgba(90,255,160,${(v*(.25+.75*gl)*.55).toFixed(3)})`;
         ctx.beginPath();ctx.arc(x,y,cell,0,TAU);ctx.fill();
         if(p.v>=40){ctx.fillStyle=`rgba(190,120,255,${(.25*gl).toFixed(3)})`;ctx.beginPath();ctx.arc(x,y,cell*.6,0,TAU);ctx.fill()}

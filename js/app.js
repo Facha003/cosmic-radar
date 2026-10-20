@@ -1,6 +1,6 @@
 /* ---------- UI ---------- */
 const $=id=>document.getElementById(id);
-const HOSTED="https://facha003.github.io/tonights-sky-atlas/"; // GitHub Pages address, opened from the claude.ai copy for location
+const HOSTED="https://facha003.github.io/cosmic-radar/"; // GitHub Pages address, opened from the claude.ai copy for location
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const S={lat:40.71,lon:-74.01,tz:"America/New_York",label:"New York",t:Date.now(),live:true,mode:store.get("sky-mode")==="now"?"now":"dark",sel:null,wx:null,win:null,sums:{}};
 const browserTz=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch(e){return "UTC"}})();
@@ -150,7 +150,7 @@ function renderQuick(){
   if(iss)picks.unshift({sel:iss.sel,n:"ISS"});
   const on=S.sel?`${S.sel.type}:${S.sel.id}`:"";
   $("quick").innerHTML=picks.length?`<span class="note">Up now:</span>`+picks.map(p=>`<button type="button" class="chip${on===`${p.sel.type}:${p.sel.id}`?" sel":""}" data-t="${p.sel.type}" data-id="${p.sel.id}">${esc(p.n)}</button>`).join(""):"";
-  $("quick").querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>{select(b.dataset.t,b.dataset.id);$("finder").scrollIntoView({behavior:reduceMotion()?"auto":"smooth",block:"nearest"})});
+  $("quick").querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>{toggleSel(b.dataset.t,b.dataset.id);if(S.sel)$("finder").scrollIntoView({behavior:reduceMotion()?"auto":"smooth",block:"nearest"})});
 }
 
 /* info card: what it is, how far, visible tonight, and which way to look */
@@ -167,6 +167,10 @@ function selPos(sel){
 function select(type,id){
   S.sel={type,id};renderQuick();renderFinder();Radar.lastDraw=0;
 }
+function deselect(){S.sel=null;renderQuick();renderFinder();Radar.lastDraw=0}
+// Tapping what's already open closes it
+const isSel=(type,id)=>S.sel&&S.sel.type===type&&S.sel.id===id;
+function toggleSel(type,id){if(isSel(type,id))deselect();else select(type,id)}
 const bestWhere=(alt,az)=>alt>=75?"almost overhead":`${heightWord(alt)} in the ${dir8(az)}`;
 function visTonight(ra,dec){
   const tr=track(ra,dec,S.win,S.lat,S.lon),s=summarize(tr),b=s.best;
@@ -366,27 +370,27 @@ function moreSight(x){
     ${x.con?`<div class="chips"><button class="chip" type="button" data-con="${x.con}">The constellation ${esc(CONS[x.con].n)}</button></div>`:""}`;
 }
 
-/* compass: phones only. Turns the radar and the dial with you. */
+/* compass: phones only. Turns both radars and the dial with you. */
 function initCompass(){
-  const b=$("compassBtn");
   if(!Compass.supported()||!matchMedia("(pointer: coarse)").matches)return;
-  b.hidden=false;
-  Compass.onChange=()=>{updateHeading();Radar.lastDraw=0};
+  Compass.onChange=()=>{updateHeading();Radar.lastDraw=0;Aurora.lastDraw=0};
+  let started=false;
   const go=async()=>{
-    b.disabled=true;
+    if(started)return;started=true;
     const r=await Compass.start();
-    b.hidden=true;
-    if(r==="ok"){store.set("sky-compass",true);$("radarNote").textContent="The top of the radar is the way your phone points. Tap a blip."}
-    else $("compassNote").textContent=r==="denied"?"Compass access is off. North stays at the top.":"No compass found on this device. North stays at the top.";
+    if(r==="ok"){$("radarNote").textContent="The top of the radar is the way your phone points. Tap a blip.";Aurora.render()}
+    else if(r==="denied")$("compassNote").textContent="Compass access is off, so north stays at the top.";
   };
-  b.onclick=go;
-  // Android needs no permission, so turn it back on by itself next time
-  if(store.get("sky-compass")&&typeof DeviceOrientationEvent.requestPermission!=="function")go();
+  // iPhone only allows the compass after a tap, so ask on the first one; elsewhere start right away
+  if(typeof DeviceOrientationEvent.requestPermission==="function"){addEventListener("pointerup",go,{once:true});addEventListener("touchend",go,{once:true})}
+  else go();
 }
 
 /* boot */
 initCities();initCompass();Radar.init();Aurora.init();
 $("tabSky").onclick=()=>showTab("sky");$("tabAur").onclick=()=>showTab("aur");
+$("fClose").onclick=deselect;
+addEventListener("keydown",e=>{if(e.key==="Escape"&&S.sel)deselect()});
 $("modeSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;store.set("sky-mode",S.mode);S.t=nowOrDusk();S.live=true;renderAll()});
 $("redBtn").onclick=()=>{const on=document.documentElement.classList.toggle("red");$("redBtn").setAttribute("aria-pressed",String(on));store.set("sky-red",on)};
 if(store.get("sky-red")){document.documentElement.classList.add("red");$("redBtn").setAttribute("aria-pressed","true")}

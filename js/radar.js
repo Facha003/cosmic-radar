@@ -1,7 +1,12 @@
 /* ---------- Radar scopes ---------- */
 const SWEEP_MS=4000,RG="61,255,168"; // sweep period; radar green as r,g,b for alpha work
-const TAU=Math.PI*2;
+const TAU=Math.PI*2,FRAME_MS=33; // ~30 fps is plenty for the sweep and easier on the battery
 const reduceMotion=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;
+// Animate a scope only while it's on screen
+function watchOnScreen(scope,cv){
+  scope.onScreen=true;
+  if("IntersectionObserver" in window)new IntersectionObserver(es=>{scope.onScreen=es[0].isIntersecting;if(scope.onScreen)scope.lastDraw=0}).observe(cv);
+}
 
 // Fit a square canvas to its box at device resolution
 function sizeCanvas(cv){
@@ -58,7 +63,7 @@ function drawScope(ctx,w,R,o){
 const Radar={
   filter:"all",blips:[],lines:[],sats:[],trails:{},hits:[],lastSat:0,lastDraw:0,
   init(){
-    this.cv=$("radar");
+    this.cv=$("radar");watchOnScreen(this,this.cv);
     this.cv.addEventListener("click",e=>this.tap(e));
     $("filters").querySelectorAll("button").forEach(b=>b.onclick=()=>{
       this.filter=b.dataset.f;
@@ -117,10 +122,10 @@ const Radar={
   },
   frame(now){
     requestAnimationFrame(t=>this.frame(t));
-    if(document.hidden||$("paneSky").hidden)return;
+    if(document.hidden||$("paneSky").hidden||!this.onScreen)return;
     const still=reduceMotion();
     if(now-this.lastSat>1000){this.lastSat=now;this.updateSats();if(still)this.lastDraw=0}
-    if(still&&this.lastDraw)return;
+    if(still?this.lastDraw:now-this.lastDraw<FRAME_MS)return;
     this.lastDraw=now;this.draw(still?null:now);
   },
   draw(now){
@@ -191,7 +196,7 @@ const Radar={
       const d=Math.hypot(h.x-px,h.y-py)-(h.b.cat==="planet"?6:0)-(h.b.rank<99?3:0);
       if(d<bd){bd=d;best=h}
     }
-    if(best&&bd<24){select(best.b.sel.type,best.b.sel.id);$("finder").scrollIntoView({behavior:reduceMotion()?"auto":"smooth",block:"nearest"})}
+    if(best&&bd<24){toggleSel(best.b.sel.type,best.b.sel.id);if(S.sel)$("finder").scrollIntoView({behavior:reduceMotion()?"auto":"smooth",block:"nearest"})}
   }
 };
 function sunAltAt(t){const s=sunPos(t);return altaz(s.ra,s.dec,t,S.lat,S.lon).alt}
