@@ -1,17 +1,17 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0a0e19">
-<title>Tonight's Sky Atlas</title>
+<meta name="theme-color" content="#04090b">
+<title>Cosmic Radar</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="css/style.css">
 
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <h1>Tonight's Sky Atlas</h1>
+      <h1>Cosmic Radar</h1>
       <p><span id="where">Finding your sky…</span> <button class="link" id="changeLoc" type="button" hidden>Change</button></p>
     </div>
     <button class="btn small" id="redBtn" type="button" aria-pressed="false" title="Red light keeps your eyes adjusted to the dark">Red light</button>
@@ -31,70 +31,107 @@
     <div class="msg" id="msg" role="status"></div>
   </header>
 
-  <p class="verdict" id="verdict"></p>
+  <nav class="tabs" role="tablist" aria-label="Radar">
+    <button type="button" role="tab" id="tabSky" aria-controls="paneSky" aria-selected="true">Cosmic Radar</button>
+    <button type="button" role="tab" id="tabAur" aria-controls="paneAur" aria-selected="false">Aurora Radar</button>
+  </nav>
 
-  <section class="special" id="special" hidden aria-labelledby="specialHead">
-    <h2 id="specialHead">Special in the sky</h2>
-    <ul class="evs" id="specialList"></ul>
-  </section>
+  <!-- Cosmic Radar -->
+  <section class="pane" id="paneSky" role="tabpanel" aria-labelledby="tabSky">
+    <p class="intro">Scan the sky for planets, stars, constellations and satellites. Select a blip to learn what it is, how far away it is and whether it's visible tonight.</p>
+    <p class="verdict" id="verdict"></p>
 
-  <div class="main">
-    <section class="up" aria-labelledby="listHead">
-      <div class="uphead">
-        <h2 id="listHead">Up now</h2>
-        <div class="seg" id="modeSeg" role="group" aria-label="Which sky to show" hidden>
-          <button type="button" data-mode="dark" aria-pressed="true">When it's dark</button>
-          <button type="button" data-mode="now" aria-pressed="false">Right now</button>
-        </div>
+    <div class="radarHead">
+      <span class="readout" id="radarTime">–</span>
+      <div class="seg" id="modeSeg" role="group" aria-label="Which sky to show" hidden>
+        <button type="button" data-mode="dark" aria-pressed="true">When it's dark</button>
+        <button type="button" data-mode="now" aria-pressed="false">Right now</button>
       </div>
-      <ul class="list" id="list"></ul>
-      <button class="link" id="moreBtn" type="button" hidden></button>
-      <p class="later note" id="later" hidden></p>
-    </section>
+    </div>
+    <div class="scope"><canvas id="radar" role="img" aria-label="Radar of the sky above you. The center is straight up and the edge is the horizon."></canvas></div>
+    <div class="seg filters" id="filters" role="group" aria-label="Show on radar">
+      <button type="button" data-f="all" aria-pressed="true">All</button>
+      <button type="button" data-f="planet" aria-pressed="false">Planets</button>
+      <button type="button" data-f="star" aria-pressed="false">Stars</button>
+      <button type="button" data-f="con" aria-pressed="false">Constellations</button>
+      <button type="button" data-f="sat" aria-pressed="false">Satellites</button>
+    </div>
+    <p class="note center" id="radarNote">Center is straight up, the edge is the horizon. Tap a blip.</p>
+    <div class="compassRow">
+      <button class="btn small" id="compassBtn" type="button" hidden>Turn the radar with my phone</button>
+      <p class="note" id="compassNote"></p>
+    </div>
+    <div class="quick" id="quick"></div>
 
-    <section class="finder" id="finder" hidden>
-      <div>
+    <section class="card" id="finder" hidden aria-live="polite">
+      <div class="cardHead">
         <div class="eyebrow" id="fKind"></div>
         <h2 class="fname" id="fName"></h2>
       </div>
-      <svg id="dial" viewBox="-116 -116 232 232" role="img" aria-label="Compass showing which way to face"></svg>
-      <div class="say" aria-live="polite">
-        <p class="sayBig" id="fSay"></p>
-        <p id="fUp"></p>
-        <p class="note" id="fistNote">One fist held out at arm's length covers about 10° of sky.</p>
+      <dl class="facts3">
+        <dt>What it is</dt><dd id="fWhat"></dd>
+        <dt>How far</dt><dd id="fFar"></dd>
+        <dt>Tonight</dt><dd id="fVis"></dd>
+      </dl>
+      <div class="findRow">
+        <svg id="dial" viewBox="-116 -116 232 232" role="img" aria-label="Compass showing which way to face"></svg>
+        <div class="say">
+          <p class="sayBig" id="fSay"></p>
+          <p id="fUp"></p>
+          <p class="note" id="fistNote">One fist at arm's length covers about 10° of sky.</p>
+        </div>
       </div>
-      <button class="btn primary" id="compassBtn" type="button" hidden>Use my phone's compass</button>
-      <p class="note" id="compassNote"></p>
       <figure class="shape" id="shapeFig">
         <div id="shape"></div>
         <figcaption class="note" id="shapeCap"></figcaption>
       </figure>
       <p class="tip" id="fTip"></p>
-      <details class="more">
+      <details class="more" id="moreBox">
         <summary>More about it</summary>
         <div class="moreBody" id="fMore"></div>
       </details>
     </section>
-  </div>
 
-  <details class="mapbox" id="mapBox">
-    <summary>Whole sky map</summary>
-    <div class="mapBody">
-      <div class="timebar">
-        <span class="t" id="tLabel">–</span>
-        <input type="range" id="slider" min="0" max="100" value="0" aria-label="Time of night">
-        <button class="btn small" id="nowBtn" type="button">Now</button>
+    <section class="special" id="special" hidden aria-labelledby="specialHead">
+      <h2 id="specialHead">Special in the sky</h2>
+      <ul class="evs" id="specialList"></ul>
+    </section>
+  </section>
+
+  <!-- Aurora Radar -->
+  <section class="pane" id="paneAur" role="tabpanel" aria-labelledby="tabAur" hidden>
+    <p class="intro">Estimate your chances of seeing the northern lights. Aurora forecast, cloud cover, darkness and nearby places to watch from.</p>
+
+    <div class="chance">
+      <div class="chanceNum" id="aChance">–</div>
+      <div class="chanceText">
+        <p class="chanceLbl" id="aLbl">Checking the forecast…</p>
+        <p class="note" id="aBest"></p>
       </div>
-      <svg id="map" viewBox="0 0 640 640" role="img" aria-label="All-sky chart"></svg>
-      <p class="note">Hold it overhead with N to the north. The middle is straight up. Tap anything to find it.</p>
     </div>
-  </details>
+    <ul class="factors" id="aFactors"></ul>
 
-  <footer>Worked out on your phone from star positions. Cloud forecast by Open-Meteo, aurora forecast by NOAA.</footer>
+    <h2>Aurora right now</h2>
+    <div class="scope"><canvas id="auroraRadar" role="img" aria-label="Aurora radar centered on you"></canvas></div>
+    <p class="note center" id="aRadarNote"></p>
+
+    <h2>Activity forecast</h2>
+    <div class="kp" id="kpChart"></div>
+    <p class="note" id="kpReadout"></p>
+
+    <h2 id="spotsHead">Places to watch from</h2>
+    <ul class="spots" id="spots"></ul>
+  </section>
+
+  <footer>Sky positions are worked out on your phone. Clouds: Open-Meteo. Aurora: NOAA. Satellites: CelesTrak. Places: OpenStreetMap (Photon).</footer>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/4.1.4/satellite.min.js"></script>
 <script src="js/data.js"></script>
 <script src="js/astro.js"></script>
 <script src="js/compass.js"></script>
+<script src="js/sats.js"></script>
 <script src="js/events.js"></script>
+<script src="js/radar.js"></script>
+<script src="js/aurora.js"></script>
 <script src="js/app.js"></script>

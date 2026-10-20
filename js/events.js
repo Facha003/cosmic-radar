@@ -14,7 +14,7 @@ async function loadAurora(){
     const rows=Array.isArray(j[0])?j.slice(1).map(a=>({time_tag:a[0],kp:a[1]})):j;
     S.kpRows=rows.map(o=>({t:Date.parse(String(o.time_tag).replace(" ","T")+"Z"),kp:+o.kp})).filter(o=>!isNaN(o.t)&&!isNaN(o.kp));
   }catch(e){S.kpRows=null}
-  renderSpecial();
+  renderSpecial();Aurora.render();
 }
 
 function localYMD(t){
@@ -38,10 +38,19 @@ function computeEvents(){
     if(rows.length){
       const kp=Math.max(...rows.map(o=>o.kp)),ml=magLat(S.lat,S.lon),need=kpNeeded(ml);
       const name=S.lat>=0?"Northern":"Southern",hor=S.lat>=0?"north":"south";
-      if(kp>=need+1)ev.push({strong:true,title:`${name} lights likely tonight`,text:`Strong activity (${Math.round(kp)} of 9). From a dark spot, look ${hor}. Phone cameras often show it better than your eyes.`});
-      else if(kp>=need)ev.push({strong:true,title:`${name} lights possible tonight`,text:`Activity ${Math.round(kp)} of 9 is about what's needed here. Look low toward the ${hor} from a dark spot.`});
-      else if(Math.abs(ml)>=45)ev.push({title:`${name} lights unlikely tonight`,text:`Activity ${Math.round(kp)} of 9. You'd need about ${Math.ceil(need)} here.`});
+      if(kp>=need+1)ev.push({strong:true,tab:"aur",title:`${name} lights likely tonight`,text:`Strong activity (${Math.round(kp)} of 9). From a dark spot, look ${hor}. Phone cameras often show it better than your eyes.`});
+      else if(kp>=need)ev.push({strong:true,tab:"aur",title:`${name} lights possible tonight`,text:`Activity ${Math.round(kp)} of 9 is about what's needed here. Look low toward the ${hor} from a dark spot.`});
+      else if(Math.abs(ml)>=45)ev.push({tab:"aur",title:`${name} lights unlikely tonight`,text:`Activity ${Math.round(kp)} of 9. You'd need about ${Math.ceil(need)} here.`});
     }
+  }
+
+  // Space stations flying over tonight
+  if(Sats.ready)for(const id of ["25544","48274"]){
+    const s=Sats.byId(id),p=s&&Sats.nextPass(s,Math.max(Date.now(),w.sunset));
+    if(!p)continue;
+    const mins=Math.max(1,Math.round((p.end-p.start)/60000));
+    ev.push({strong:p.start-Date.now()<3*3600e3,title:`${id==="25544"?"The ISS":"Tiangong"} flies over at ${fmt(p.start)}`,
+      text:`It appears in the ${dir8(p.startAz)}, climbs to ${Math.round(p.max)}° in the ${dir8(p.maxAz)} and fades in the ${dir8(p.endAz)} about ${mins} minute${mins>1?"s":""} later. It looks like a bright star moving steadily.`,sel:{type:"sat",id}});
   }
 
   // Meteor showers near their peak
@@ -96,7 +105,11 @@ function renderSpecial(){
   $("special").hidden=!ev.length;
   $("specialList").innerHTML=ev.map((e,i)=>{
     const body=`<span class="evT">${esc(e.title)}</span><span class="evX">${esc(e.text)}</span>`;
-    return `<li class="ev${e.strong?" strong":""}">${e.sel?`<button type="button" class="evBtn" data-i="${i}">${body}</button>`:body}</li>`;
+    return `<li class="ev${e.strong?" strong":""}">${e.sel||e.tab?`<button type="button" class="evBtn" data-i="${i}">${body}</button>`:body}</li>`;
   }).join("");
-  $("specialList").querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>{const e=ev[+b.dataset.i];select(e.sel.type,e.sel.id,true)});
+  $("specialList").querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>{
+    const e=ev[+b.dataset.i];
+    if(e.tab){showTab(e.tab);$("paneAur").scrollIntoView({behavior:reduceMotion()?"auto":"smooth"});return}
+    select(e.sel.type,e.sel.id);$("finder").scrollIntoView({behavior:reduceMotion()?"auto":"smooth",block:"nearest"});
+  });
 }

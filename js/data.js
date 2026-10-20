@@ -335,3 +335,12 @@ const ECLIPSES=[
  {t:"2030-06-15T18:33Z",type:"partial lunar"},
  {t:"2030-11-25T06:50Z",type:"total solar",where:"Botswana, South Africa and Australia"}
 ];
+
+// One line on what each planet is
+const PLANET_WHAT={
+ mercury:"The smallest planet and the closest to the Sun.",
+ venus:"Earth's near twin in size, wrapped in bright clouds that reflect lots of sunlight.",
+ mars:"The red planet, half Earth's size, colored by rusty dust.",
+ jupiter:"The biggest planet, a gas giant 11 times wider than Earth.",
+ saturn:"The ringed gas giant. Its rings are made of ice and rock."
+};
