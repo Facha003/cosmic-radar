@@ -8,71 +8,81 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="css/style.css">
 
-
 <div class="wrap">
   <header class="top">
     <div class="brand">
       <h1>Tonight's Sky Atlas</h1>
       <p><span id="where">Finding your sky…</span> <button class="link" id="changeLoc" type="button" hidden>Change</button></p>
     </div>
-    <div class="loc">
-      <div class="start" id="start">
-        <button class="btn primary big" id="geo" type="button">Use my location</button>
-        <p class="note" id="geoNote">Your phone will ask first. Your location stays on this device.</p>
-        <button class="link" id="manualBtn" type="button">Enter a place instead</button>
-        <div class="manual" id="manual" hidden>
-          <select class="ctl" id="city" aria-label="Choose a city"></select>
-          <form class="coords" id="coordForm">
-            <input class="ctl mono" id="lat" inputmode="decimal" placeholder="Lat" aria-label="Latitude">
-            <input class="ctl mono" id="lon" inputmode="decimal" placeholder="Lon" aria-label="Longitude">
-            <button class="btn" type="submit">Set</button>
-          </form>
-        </div>
+    <button class="btn small" id="redBtn" type="button" aria-pressed="false" title="Red light keeps your eyes adjusted to the dark">Red light</button>
+    <div class="start" id="start">
+      <button class="btn primary big" id="geo" type="button">Use my location</button>
+      <p class="note" id="geoNote">Your phone will ask first. Your location stays on this device.</p>
+      <button class="link" id="manualBtn" type="button">Enter a place instead</button>
+      <div class="manual" id="manual" hidden>
+        <select class="ctl" id="city" aria-label="Choose a city"></select>
+        <form class="coords" id="coordForm">
+          <input class="ctl mono" id="lat" inputmode="decimal" placeholder="Lat" aria-label="Latitude">
+          <input class="ctl mono" id="lon" inputmode="decimal" placeholder="Lon" aria-label="Longitude">
+          <button class="btn" type="submit">Set</button>
+        </form>
       </div>
-      <button class="btn" id="redBtn" type="button" aria-pressed="false" title="Red light keeps your eyes adjusted to the dark">Red light</button>
-      <div class="msg" id="msg" role="status"></div>
     </div>
+    <div class="msg" id="msg" role="status"></div>
   </header>
 
-  <section class="cond" aria-label="Viewing conditions tonight">
-    <div><span class="eyebrow">Dark sky window</span><span class="big num" id="darkWin">–</span><span class="sub" id="darkSub"></span></div>
-    <div><span class="eyebrow">Moon</span><div class="moonrow"><svg id="moonIcon" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"></svg><div><div class="big" id="moonName">–</div><div class="sub" id="moonSub"></div></div></div></div>
-    <div><span class="eyebrow">Cloud cover tonight</span><span class="big" id="cloudBig">–</span><div class="clouds" id="cloudBars" aria-hidden="true"></div><span class="sub" id="cloudSub"></span></div>
-    <div><span class="eyebrow">Verdict</span><span class="big verdict" id="verdict">–</span><span class="sub" id="verdictSub"></span></div>
-  </section>
+  <p class="verdict" id="verdict"></p>
 
-  <section class="main">
-    <div class="chart">
+  <div class="main">
+    <section class="up" aria-labelledby="listHead">
+      <h2 id="listHead">Up now</h2>
+      <ul class="list" id="list"></ul>
+      <button class="link" id="moreBtn" type="button" hidden></button>
+      <p class="later note" id="later" hidden></p>
+    </section>
+
+    <section class="finder" id="finder" hidden>
+      <div>
+        <div class="eyebrow" id="fKind"></div>
+        <h2 class="fname" id="fName"></h2>
+      </div>
+      <svg id="dial" viewBox="-116 -116 232 232" role="img" aria-label="Compass showing which way to face"></svg>
+      <div class="say" aria-live="polite">
+        <p class="sayBig" id="fSay"></p>
+        <p id="fUp"></p>
+        <p class="note" id="fistNote">One fist held out at arm's length covers about 10° of sky.</p>
+      </div>
+      <button class="btn primary" id="compassBtn" type="button" hidden>Use my phone's compass</button>
+      <p class="note" id="compassNote"></p>
+      <figure class="shape" id="shapeFig">
+        <div id="shape"></div>
+        <figcaption class="note" id="shapeCap"></figcaption>
+      </figure>
+      <p class="tip" id="fTip"></p>
+      <details class="more">
+        <summary>More about it</summary>
+        <div class="moreBody" id="fMore"></div>
+      </details>
+    </section>
+  </div>
+
+  <details class="mapbox" id="mapBox">
+    <summary>Whole sky map</summary>
+    <div class="mapBody">
       <div class="timebar">
-        <label class="eyebrow" for="slider">Sky at</label>
         <span class="t" id="tLabel">–</span>
         <input type="range" id="slider" min="0" max="100" value="0" aria-label="Time of night">
-        <button class="btn" id="nowBtn" type="button">Now</button>
+        <button class="btn small" id="nowBtn" type="button">Now</button>
       </div>
-      <svg id="map" viewBox="0 0 640 640" role="img" aria-label="All-sky chart for the selected time"></svg>
-      <p class="hint">Hold the chart over your head with N pointing north. East sits on the left because you are looking up. The center is straight overhead and the edge is the horizon. Tap a star or a name for details.</p>
+      <svg id="map" viewBox="0 0 640 640" role="img" aria-label="All-sky chart"></svg>
+      <p class="note">Hold it overhead with N to the north. The middle is straight up. Tap anything to find it.</p>
     </div>
-    <aside class="detail" id="detail" aria-live="polite"></aside>
-  </section>
+  </details>
 
-  <section style="display:flex;flex-direction:column;gap:12px">
-    <div class="rosterhead">
-      <h2>Constellations tonight</h2>
-      <div class="tabs" role="group" aria-label="Filter constellations">
-        <button type="button" id="fVis" aria-pressed="true">Visible tonight</button>
-        <button type="button" id="fAll" aria-pressed="false">All</button>
-      </div>
-    </div>
-    <div class="roster" id="roster"></div>
-  </section>
-
-  <footer>
-    <p>Positions are calculated in your browser from star catalog coordinates (J2000) and standard low-precision formulas for the Sun and Moon. They are accurate to within about half a degree, which is plenty for finding things by eye. "Visible" means the constellation's center climbs at least 15° above the horizon while the sky is fully dark.</p>
-    <p id="wxNote">Cloud forecast from Open-Meteo when the page can reach it.</p>
-  </footer>
+  <footer>Worked out on your phone from star positions. Cloud forecast by Open-Meteo.</footer>
 </div>
-
 
 <script src="js/data.js"></script>
 <script src="js/astro.js"></script>
+<script src="js/compass.js"></script>
 <script src="js/app.js"></script>

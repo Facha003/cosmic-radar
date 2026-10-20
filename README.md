@@ -7,7 +7,8 @@ index.html      page markup
 css/style.css   styles (dark night theme, red-light mode)
 js/data.js      bright stars, constellation lines and myths, star facts, city list
 js/astro.js     astronomy math: sidereal time, alt/az, Sun, Moon, dark window
-js/app.js       location, weather (Open-Meteo), sky chart, lists, detail panel
+js/compass.js   phone compass heading (smoothed)
+js/app.js       location, weather (Open-Meteo), "up now" list, compass finder, sky map
 ```
 
 No build step and no dependencies. Serve the folder over HTTPS (or `localhost`) so the browser can ask for your location:
