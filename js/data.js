@@ -244,5 +244,55 @@ const CITIES=[
 ];
 
 
-// Best-known constellations first; the "up now" list follows this order
-const FAMOUS=["Ori","UMa","Cas","Sco","Cru","UMi","Cyg","Leo","Tau","Gem","Lyr","Sgr","Peg","And","Per","CMa","Aql","Boo","Vir","Cen","Dra","Her","Aur","Ari","Cnc","Cap","Aqr","Lib","CrB","Del","Cep","CMi","Oph","Car","Crv","Hya","Eri","PsA"];
+// Famous things to find, best known first. The "up now" list follows this order.
+// s: star ids (from STARS); l: lines to draw, or "con" to use the whole constellation's lines
+const SIGHTS=[
+ {id:"dipper",n:"Big Dipper",kind:"Star pattern",con:"UMa",s:["dub","mer","phe","meg","ali","miz","alkd"],l:[["alkd","miz"],["miz","ali"],["ali","meg"],["meg","dub"],["dub","mer"],["mer","phe"],["phe","meg"]],
+  tip:"Seven bright stars shaped like a ladle. The two stars at the end of the bowl point to Polaris."},
+ {id:"belt",n:"Orion's Belt",kind:"Star pattern",con:"Ori",s:["alk","aln","min"],l:[["alk","aln"],["aln","min"]],
+  tip:"Three bright stars in a short, straight row across the middle of Orion."},
+ {id:"m45",n:"The Pleiades",kind:"Star cluster",con:"Tau",s:["m45"],
+  tip:"A tiny misty dipper of stars, also called the Seven Sisters. Look just beside it and more stars appear."},
+ {id:"polaris",n:"Polaris, the North Star",kind:"Star",con:"UMi",s:["polaris"],
+  tip:"Not very bright, but it never moves. Follow the two end stars of the Big Dipper's bowl to it."},
+ {id:"sir",n:"Sirius",kind:"Star",con:"CMa",s:["sir"],
+  tip:"The brightest star in the night sky. Follow Orion's Belt down and to the left."},
+ {id:"tri",n:"Summer Triangle",kind:"Star pattern",con:null,s:["veg","den","alt"],l:[["veg","den"],["den","alt"],["alt","veg"]],
+  tip:"Three bright stars, Vega, Deneb and Altair, forming a big triangle."},
+ {id:"casw",n:"Cassiopeia's W",kind:"Star pattern",con:"Cas",l:"con",
+  tip:"Five stars in a W or M shape, on the other side of Polaris from the Big Dipper."},
+ {id:"bet",n:"Betelgeuse",kind:"Star",con:"Ori",s:["bet"],
+  tip:"Orion's orange-red shoulder, above and left of the belt."},
+ {id:"m42",n:"Orion Nebula",kind:"Nebula",con:"Ori",s:["m42"],
+  tip:"The fuzzy middle star of Orion's sword, hanging below the belt."},
+ {id:"m31",n:"Andromeda Galaxy",kind:"Galaxy",con:"And",s:["m31"],
+  tip:"A faint smudge, best from a dark place. It is a whole galaxy, the farthest thing your eyes can see."},
+ {id:"veg",n:"Vega",kind:"Star",con:"Lyr",s:["veg"],
+  tip:"A brilliant blue-white star, the brightest corner of the Summer Triangle."},
+ {id:"arc",n:"Arcturus",kind:"Star",con:"Boo",s:["arc"],
+  tip:"Follow the curve of the Big Dipper's handle to this bright orange star. Arc to Arcturus."},
+ {id:"ldip",n:"Little Dipper",kind:"Star pattern",con:"UMi",l:"con",
+  tip:"A small, faint ladle with Polaris at the end of its handle. Needs a darker sky."},
+ {id:"teapot",n:"The Teapot",kind:"Star pattern",con:"Sgr",l:"con",
+  tip:"Eight stars shaped like a teapot, low in the south. The Milky Way rises like steam from its spout."},
+ {id:"square",n:"Great Square of Pegasus",kind:"Star pattern",con:"Peg",s:["mrk","sht","alr","alg"],l:[["mrk","sht"],["sht","alr"],["alr","alg"],["alg","mrk"]],
+  tip:"Four stars marking a big, mostly empty square."},
+ {id:"cross",n:"Southern Cross",kind:"Star pattern",con:"Cru",l:"con",
+  tip:"A small, bright kite-shaped cross. Its long arm points toward the south pole of the sky."},
+ {id:"rke",n:"Alpha Centauri",kind:"Star",con:"Cen",s:["rke"],
+  tip:"The nearest star system to the Sun. With its neighbor Hadar it points to the Southern Cross."},
+ {id:"ant",n:"Antares",kind:"Star",con:"Sco",s:["ant"],
+  tip:"The red heart of the Scorpion, low in the south."},
+ {id:"ald",n:"Aldebaran",kind:"Star",con:"Tau",s:["ald"],
+  tip:"The orange eye of the Bull. Follow Orion's Belt up and to the right."},
+ {id:"rig",n:"Rigel",kind:"Star",con:"Ori",s:["rig"],
+  tip:"Orion's bright blue-white foot, below and right of the belt."},
+ {id:"cap",n:"Capella",kind:"Star",con:"Aur",s:["cap"],
+  tip:"A bright yellow star high in the north on winter evenings."},
+ {id:"can",n:"Canopus",kind:"Star",con:"Car",s:["can"],
+  tip:"The second-brightest star in the night sky, seen from the south."},
+ {id:"m44",n:"Beehive Cluster",kind:"Star cluster",con:"Cnc",s:["m44"],
+  tip:"A misty patch between Gemini and Leo. Binoculars turn it into a swarm of stars."},
+ {id:"m13",n:"Hercules Cluster",kind:"Star cluster",con:"Her",s:["m13"],
+  tip:"A faint fuzzy ball of hundreds of thousands of stars. Best with binoculars."}
+];

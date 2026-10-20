@@ -13,9 +13,16 @@ const dir8=az=>DIR8[Math.round(norm(az)/45)%8];
 const heightWord=alt=>alt>=75?"overhead":alt>=50?"high up":alt>=25?"halfway up":"low";
 const reduceMotion=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// Brightest star of each constellation, and its place in the famous-first order
-for(const k in CONS){const c=CONS[k];c.br=c.stars.slice().sort((a,b)=>STARS[a][4]-STARS[b][4])[0];const i=FAMOUS.indexOf(k);c.rank=i<0?99:i}
-const byFame=(a,b)=>CONS[a.k].rank-CONS[b.k].rank;
+// Brightest star of each constellation
+for(const k in CONS){const c=CONS[k];c.br=c.stars.slice().sort((a,b)=>STARS[a][4]-STARS[b][4])[0]}
+// Fill in each famous sight's stars, lines, center and brightest star
+const SIGHT={};
+for(const x of SIGHTS){
+  if(x.l==="con"){x.l=CONS[x.con].l;x.s=[...new Set(x.l.flat())]}
+  x.c=x.s.length>1?centroid(x.s):{ra:STARS[x.s[0]][2]*15,dec:STARS[x.s[0]][3]};
+  x.br=x.s.slice().sort((a,b)=>STARS[a][4]-STARS[b][4])[0];
+  SIGHT[x.id]=x;
+}
 
 /* location */
 function initCities(){
@@ -68,7 +75,7 @@ function nowOrDusk(){const n=Date.now();return S.mode==="dark"&&n<S.win.dusk?S.w
 function computeNight(){
   const w=nightWindow(Date.now(),S.lat,S.lon,S.tz);S.win=w;
   S.sums={};
-  for(const k in CONS){const c=CONS[k],tr=track(c.c.ra,c.c.dec,w,S.lat,S.lon);S.sums[k]={tr,sum:summarize(tr)}}
+  for(const x of SIGHTS)S.sums[x.id]=track(x.c.ra,x.c.dec,w,S.lat,S.lon);
   const ph=moonPhase((w.dusk+w.dawn)/2);
   let upCount=0,n=0,rise=null,set=null,prev=null;
   for(let t=w.sunset;t<=w.sunrise;t+=10*60000){const a=moonAltAz(t,S.lat,S.lon).alt;if(t>=w.dusk&&t<=w.dawn){n++;if(a>0)upCount++}if(prev!==null){if(prev<=0&&a>0&&!rise)rise=t;if(prev>0&&a<=0&&!set)set=t}prev=a}
@@ -113,42 +120,45 @@ async function loadWeather(){
 
 /* up now list */
 function upNow(){
-  return Object.keys(CONS).map(k=>({k,p:altaz(CONS[k].c.ra,CONS[k].c.dec,S.t,S.lat,S.lon)}))
-    .filter(o=>o.p.alt>=VIS).sort(byFame);
+  return SIGHTS.map(x=>({x,p:altaz(x.c.ra,x.c.dec,S.t,S.lat,S.lon)})).filter(o=>o.p.alt>=VIS);
 }
 function whenLabel(){
   if(!S.live)return `Up at ${fmt(S.t)}`;
   if(Date.now()<S.win.dusk&&S.mode==="dark")return `Up once it's dark (${fmt(S.win.dusk)})`;
   return `Up now · ${fmt(S.t)}`+(Date.now()<S.win.dusk?" (still light out)":"");
 }
-const selCon=()=>S.sel?(S.sel.type==="con"?S.sel.id:STARS[S.sel.id][1]):null;
+const selCon=()=>{const s=S.sel;return !s?null:s.type==="con"?s.id:s.type==="star"?STARS[s.id][1]:SIGHT[s.id].con};
 function arrowSvg(az){return `<svg class="arrow" viewBox="-12 -12 24 24" data-az="${az.toFixed(1)}" aria-hidden="true"><circle r="11" fill="none" stroke="var(--line)"/><path d="M0 -8L5 6L0 3L-5 6Z" fill="var(--gilt)"/></svg>`}
 function overheadSvg(){return `<svg class="arrow" viewBox="-12 -12 24 24" aria-hidden="true"><circle r="11" fill="none" stroke="var(--line)"/><circle r="4" fill="var(--gilt)"/></svg>`}
 function updateArrows(){const h=Compass.heading||0;document.querySelectorAll(".arrow[data-az]").forEach(a=>a.style.transform=`rotate(${+a.dataset.az-h}deg)`)}
 function renderList(){
   const up=upNow(),shown=S.more?up:up.slice(0,6);
-  if(!S.sel&&up.length)S.sel={type:"con",id:up[0].k};
+  if(!S.sel&&up.length)S.sel={type:"sight",id:up[0].x.id};
   $("listHead").textContent=whenLabel();
   // The choice only matters before dark
   $("modeSeg").hidden=Date.now()>=S.win.dusk;
   $("modeSeg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===S.mode)));
-  const sk=selCon();
-  $("list").innerHTML=shown.map(({k,p})=>`<li><button type="button" class="row${k===sk?" sel":""}" data-k="${k}">${p.alt>=75?overheadSvg():arrowSvg(p.az)}<span class="nm">${esc(CONS[k].n)}</span><span class="where">${p.alt>=75?"Straight overhead":`${cap(dir8(p.az))} · ${heightWord(p.alt)}`}</span></button></li>`).join("")
+  const on=S.sel&&S.sel.type==="sight"?S.sel.id:null;
+  $("list").innerHTML=shown.map(({x,p})=>`<li><button type="button" class="row${x.id===on?" sel":""}" data-s="${x.id}">${p.alt>=75?overheadSvg():arrowSvg(p.az)}<span class="nm">${esc(x.n)}</span><span class="where">${p.alt>=75?"Straight overhead":`${cap(dir8(p.az))} · ${heightWord(p.alt)}`}</span></button></li>`).join("")
     ||`<li class="empty">Nothing is high enough to see easily right now.</li>`;
   $("moreBtn").hidden=up.length<=6;
   $("moreBtn").textContent=S.more?"Show fewer":`Show ${up.length-6} more`;
-  // A few bright ones still to come
-  const upSet=new Set(up.map(o=>o.k));
-  const later=Object.keys(CONS).filter(k=>!upSet.has(k)).map(k=>{const r=S.sums[k].tr.find(p=>p.t>S.t&&p.alt>=VIS);return r&&{k,t:r.t}})
-    .filter(Boolean).sort(byFame).slice(0,3).sort((a,b)=>a.t-b.t);
+  // A few famous ones still to come
+  const upSet=new Set(up.map(o=>o.x.id));
+  const later=SIGHTS.filter(x=>!upSet.has(x.id)).map(x=>{const r=S.sums[x.id].find(p=>p.t>S.t&&p.alt>=VIS);return r&&{x,t:r.t}})
+    .filter(Boolean).slice(0,3).sort((a,b)=>a.t-b.t);
   $("later").hidden=!later.length;
-  $("later").innerHTML=later.length?"Later tonight: "+later.map(o=>`<button class="link" type="button" data-k="${o.k}">${esc(CONS[o.k].n)}</button> after ${fmt(o.t)}`).join(", "):"";
-  document.querySelectorAll("#list [data-k], #later [data-k]").forEach(b=>b.onclick=()=>select("con",b.dataset.k,true));
+  $("later").innerHTML=later.length?"Later tonight: "+later.map(o=>`<button class="link" type="button" data-s="${o.x.id}">${esc(o.x.n)}</button> after ${fmt(o.t)}`).join(", "):"";
+  document.querySelectorAll("#list [data-s], #later [data-s]").forEach(b=>b.onclick=()=>select("sight",b.dataset.s,true));
   updateArrows();
 }
 
 /* finder: compass + how it looks */
-function selRaDec(sel){if(sel.type==="con")return CONS[sel.id].c;const s=STARS[sel.id];return {ra:s[2]*15,dec:s[3]}}
+function selRaDec(sel){
+  if(sel.type==="sight")return SIGHT[sel.id].c;
+  if(sel.type==="con")return CONS[sel.id].c;
+  const s=STARS[sel.id];return {ra:s[2]*15,dec:s[3]};
+}
 function select(type,id,scroll){
   S.sel={type,id};renderList();renderFinder();
   if($("mapBox").open)renderMap();
@@ -158,17 +168,31 @@ function renderFinder(){
   const sel=S.sel,f=$("finder");
   if(!sel){f.hidden=true;return}
   f.hidden=false;
-  const isCon=sel.type==="con",k=selCon(),c=CONS[k],rd=selRaDec(sel);
+  const rd=selRaDec(sel),k=selCon(),c=k&&CONS[k];
   S.tp=altaz(rd.ra,rd.dec,S.t,S.lat,S.lon);
   const r=track(rd.ra,rd.dec,S.win,S.lat,S.lon).find(p=>p.t>S.t&&p.alt>=VIS);S.tRise=r?r.t:null;
-  $("fKind").textContent=isCon?c.m:`A star in ${c.n}`;
-  $("fName").textContent=isCon?c.n:STARS[sel.id][0];
+  let kind,name,tip,more,shape;
+  if(sel.type==="sight"){
+    const x=SIGHT[sel.id],one=x.s.length===1?x.s[0]:null;
+    kind=x.kind+(c?` in ${c.n}`:"");name=x.n;tip=x.tip;
+    more=one?moreStar(one,true):moreSight(x);
+    shape=one?{center:c.c,lines:c.l,ring:[one],label:[one]}
+      :{center:x.c,lines:x.l,faint:c&&x.l!==c.l?c.l:[],ring:[],label:[x.br]};
+  }else if(sel.type==="con"){
+    kind=`Constellation · ${c.m}`;name=c.n;tip=c.tip;more=moreCon(k);
+    shape={center:c.c,lines:c.l,ring:[],label:[c.br]};
+  }else{
+    kind=`${isDeep(sel.id)?cap(STARS[sel.id][5]):"Star"} in ${c.n}`;name=STARS[sel.id][0];
+    tip=FACTS[sel.id]||seeIt(STARS[sel.id][4])+".";more=moreStar(sel.id,false);
+    shape={center:c.c,lines:c.l,ring:[sel.id],label:[sel.id,c.br]};
+  }
+  $("fKind").textContent=kind;$("fName").textContent=name;
   drawDial();S.say=null;updateHeading();
   const above=S.tp.alt>0;
   $("shapeFig").hidden=!above;
-  if(above){$("shape").innerHTML=shapeSvg(k,isCon?null:sel.id);$("shapeCap").textContent=`How it looks facing ${dir8(S.tp.az)}`}
-  $("fTip").textContent=isCon?c.tip:(FACTS[sel.id]||seeIt(STARS[sel.id][4])+".");
-  $("fMore").innerHTML=isCon?moreCon(k):moreStar(sel.id);
+  if(above){$("shape").innerHTML=shapeSvg(shape,name);$("shapeCap").textContent=`How it looks facing ${dir8(S.tp.az)}`}
+  $("fTip").textContent=tip;
+  $("fMore").innerHTML=more;
   $("fMore").querySelectorAll("[data-star]").forEach(b=>b.onclick=()=>select("star",b.dataset.star));
   $("fMore").querySelectorAll("[data-con]").forEach(b=>b.onclick=()=>select("con",b.dataset.con));
 }
@@ -214,33 +238,37 @@ function updateHeading(){
 function vec(p){const a=p.alt*D2R,z=p.az*D2R;return [Math.cos(a)*Math.sin(z),Math.cos(a)*Math.cos(z),Math.sin(a)]}
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-function shapeSvg(k,hi){
-  const c=CONS[k],cv=vec(altaz(c.c.ra,c.c.dec,S.t,S.lat,S.lon));
+// o: {center, lines, faint (context lines), ring (ids to circle), label (ids to name)}
+function shapeSvg(o,name){
+  const cv=vec(altaz(o.center.ra,o.center.dec,S.t,S.lat,S.lon));
   let up=[0,0,1];const d=dot(up,cv);up=up.map((x,i)=>x-d*cv[i]);
   const ul=Math.hypot(...up);up=ul<1e-3?[0,1,0]:up.map(x=>x/ul);
   const rt=cross(cv,up);
   const pr=(alt,az)=>{const v=vec({alt,az}),z=dot(v,cv);return z>.2?[dot(v,rt)/z,-dot(v,up)/z]:null};
-  const ids=new Set(c.l.flat());if(hi)ids.add(hi);
+  const faint=o.faint||[],ids=new Set([...o.lines.flat(),...faint.flat(),...o.ring]);
   const P={};
   for(const id of ids){const s=STARS[id],a=altaz(s[2]*15,s[3],S.t,S.lat,S.lon),q=pr(a.alt,a.az);if(q)P[id]=q}
   const xs=Object.values(P).map(q=>q[0]),ys=Object.values(P).map(q=>q[1]);
   if(!xs.length)return "";
-  const W=300,H=190,pad=22,cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
-  const sc=Math.min((W-2*pad)/Math.max(.05,Math.max(...xs)-Math.min(...xs)),(H-2*pad)/Math.max(.05,Math.max(...ys)-Math.min(...ys)));
+  const W=300,H=190,pad=24,cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
+  const sc=Math.min((W-2*pad)/Math.max(.05,Math.max(...xs)-Math.min(...xs)),(H-2*pad)/Math.max(.05,Math.max(...ys)-Math.min(...ys)),900);
   const X=q=>(W/2+(q[0]-cx)*sc).toFixed(1),Y=q=>(H/2+(q[1]-cy)*sc).toFixed(1);
   let g="";
   // horizon, when it's in view
   const az0=Math.atan2(cv[0],cv[1])*R2D,hz=[];
   for(let a=-80;a<=80;a+=4){const q=pr(0,az0+a);if(q)hz.push(`${X(q)},${Y(q)}`)}
   if(hz.length>1)g+=`<polyline points="${hz.join(" ")}" fill="none" stroke="var(--muted)" stroke-dasharray="4 4"/><text x="8" y="${H-8}" fill="var(--muted)" font-size="11" font-family="var(--body)">horizon below</text>`;
-  for(const [a,b] of c.l)if(P[a]&&P[b])g+=`<line x1="${X(P[a])}" y1="${Y(P[a])}" x2="${X(P[b])}" y2="${Y(P[b])}" stroke="var(--gilt)" stroke-opacity=".55" stroke-width="1.4"/>`;
+  const seg=(a,b,st)=>P[a]&&P[b]?`<line x1="${X(P[a])}" y1="${Y(P[a])}" x2="${X(P[b])}" y2="${Y(P[b])}" ${st}/>`:"";
+  for(const [a,b] of faint)g+=seg(a,b,`stroke="var(--muted)" stroke-opacity=".35" stroke-width="1"`);
+  for(const [a,b] of o.lines)g+=seg(a,b,`stroke="var(--gilt)" stroke-opacity="${faint.length?.9:.55}" stroke-width="${faint.length?2:1.4}"`);
   for(const id in P){
-    const s=STARS[id],r=starR(s[4])+.6;
-    g+=`<circle cx="${X(P[id])}" cy="${Y(P[id])}" r="${r.toFixed(2)}" fill="${SPC[s[5][0]]||"#fff"}"/>`;
-    if(id===hi)g+=`<circle cx="${X(P[id])}" cy="${Y(P[id])}" r="${(r+5).toFixed(1)}" fill="none" stroke="var(--gilt)" stroke-width="1.5"/>`;
-    if(id===c.br||id===hi)g+=`<text x="${(+X(P[id])+r+4).toFixed(1)}" y="${(+Y(P[id])+4).toFixed(1)}" fill="var(--fg)" font-size="12" font-family="var(--body)">${esc(s[0])}</text>`;
+    const s=STARS[id],x=X(P[id]),y=Y(P[id]);let r;
+    if(isDeep(id)){r=6;g+=`<circle cx="${x}" cy="${y}" r="6" fill="#9fb3d9" fill-opacity=".25" stroke="#9fb3d9" stroke-dasharray="1.5 1.5"/>`}
+    else{r=starR(s[4])+.6;g+=`<circle cx="${x}" cy="${y}" r="${r.toFixed(2)}" fill="${SPC[s[5][0]]||"#fff"}"/>`}
+    if(o.ring.includes(id))g+=`<circle cx="${x}" cy="${y}" r="${(r+5).toFixed(1)}" fill="none" stroke="var(--gilt)" stroke-width="1.5"/>`;
+    if(o.label.includes(id))g+=`<text x="${(+x+r+(o.ring.includes(id)?8:4)).toFixed(1)}" y="${(+y+4).toFixed(1)}" fill="var(--fg)" font-size="12" font-family="var(--body)">${esc(s[0].replace(/ \(M\d+\)/,""))}</text>`;
   }
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(c.n)} as it looks right now">${g}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(name)} as it looks right now">${g}</svg>`;
 }
 
 /* more about it (closed by default) */
@@ -258,12 +286,18 @@ function moreCon(k){
   return `<p>${esc(c.myth)}</p><p class="note">Best seen: ${esc(c.best)}</p>
     <div class="chips">${stars.map(id=>`<button class="chip" type="button" data-star="${id}">${esc(STARS[id][0])}</button>`).join("")}</div>`;
 }
-function moreStar(id){
+function moreStar(id,withFact){
   const s=STARS[id],cl=s[5][0];
   const dist=s[6]>=1e6?`${(s[6]/1e6).toFixed(1)} million light-years`:`${s[6].toLocaleString()} light-years`;
-  return `<dl class="facts"><dt>Distance</dt><dd>${dist}</dd><dt>Its light left</dt><dd>${lightLeft(s[6])}</dd>
+  return `${withFact&&FACTS[id]?`<p>${esc(FACTS[id])}</p>`:""}<dl class="facts"><dt>Distance</dt><dd>${dist}</dd><dt>Its light left</dt><dd>${lightLeft(s[6])}</dd>
     ${isDeep(id)?"":`<dt>Color</dt><dd>${COLOR[cl]||""}, about ${TEMP[cl]||"?"} K</dd>`}<dt>Brightness</dt><dd>${esc(seeIt(s[4]))}</dd></dl>
-    <div class="chips"><button class="chip" type="button" data-con="${s[1]}">Back to ${esc(CONS[s[1]].n)}</button></div>`;
+    <div class="chips"><button class="chip" type="button" data-con="${s[1]}">The constellation ${esc(CONS[s[1]].n)}</button></div>`;
+}
+
+function moreSight(x){
+  const named=x.s.filter(id=>!/^[α-ω]/.test(STARS[id][0])).sort((a,b)=>STARS[a][4]-STARS[b][4]);
+  return `<p class="note">Its stars</p><div class="chips">${named.map(id=>`<button class="chip" type="button" data-star="${id}">${esc(STARS[id][0])}</button>`).join("")}</div>
+    ${x.con?`<div class="chips"><button class="chip" type="button" data-con="${x.con}">The constellation ${esc(CONS[x.con].n)}</button></div>`:""}`;
 }
 
 /* whole sky map (closed by default) */
