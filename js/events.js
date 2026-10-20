@@ -1,8 +1,15 @@
 /* ---------- Special things in the sky ---------- */
 // Geomagnetic latitude from a tilted-dipole model (pole near 80.8°N, 72.6°W)
 function magLat(lat,lon){const p=80.8*D2R;return Math.asin(Math.sin(lat*D2R)*Math.sin(p)+Math.cos(lat*D2R)*Math.cos(p)*Math.cos((lon+72.6)*D2R))*R2D}
-// Rough Kp needed to see aurora low on the horizon at that geomagnetic latitude
-const kpNeeded=ml=>Math.max(0,(64-Math.abs(ml))/2.3);
+// Kp needed to see aurora low on the horizon, by geomagnetic latitude. Tuned to common experience:
+// Tromsø about Kp 1, Oslo about 4, Scotland about 5, New York about 7–8.
+const KP_LINE=[[48,9],[50,8],[52,7],[55,6],[58,5],[60,4],[62,3],[64,2],[67,1],[70,0]];
+function kpNeeded(ml){
+  const m=Math.abs(ml);
+  if(m<=KP_LINE[0][0])return 9+(KP_LINE[0][0]-m)/2;
+  for(let i=1;i<KP_LINE.length;i++){const [a,ka]=KP_LINE[i-1],[b,kb]=KP_LINE[i];if(m<=b)return ka+(kb-ka)*(m-a)/(b-a)}
+  return 0;
+}
 
 // NOAA's 3-hour Kp forecast (0–9 scale of geomagnetic activity)
 async function loadAurora(){
@@ -38,9 +45,9 @@ function computeEvents(){
     if(rows.length){
       const kp=Math.max(...rows.map(o=>o.kp)),ml=magLat(S.lat,S.lon),need=kpNeeded(ml);
       const name=S.lat>=0?"Northern":"Southern",hor=S.lat>=0?"north":"south";
-      if(kp>=need+1)ev.push({strong:true,tab:"aur",title:`${name} lights likely tonight`,text:`Strong activity (${Math.round(kp)} of 9). From a dark spot, look ${hor}. Phone cameras often show it better than your eyes.`});
-      else if(kp>=need)ev.push({strong:true,tab:"aur",title:`${name} lights possible tonight`,text:`Activity ${Math.round(kp)} of 9 is about what's needed here. Look low toward the ${hor} from a dark spot.`});
-      else if(Math.abs(ml)>=45)ev.push({tab:"aur",title:`${name} lights unlikely tonight`,text:`Activity ${Math.round(kp)} of 9. You'd need about ${Math.ceil(need)} here.`});
+      if(kp>=need+1)ev.push({strong:true,tab:"aur",title:`${name} lights likely tonight`,text:`Strong activity (Kp ${kp.toFixed(1)} of 9). From a dark spot, look ${hor}. Phone cameras often show it better than your eyes.`});
+      else if(kp>=need)ev.push({strong:true,tab:"aur",title:`${name} lights possible tonight`,text:`Activity Kp ${kp.toFixed(1)} of 9 is about what's needed here. Look low toward the ${hor} from a dark spot.`});
+      else if(Math.abs(ml)>=45)ev.push({tab:"aur",title:`${name} lights unlikely tonight`,text:`Activity Kp ${kp.toFixed(1)} of 9. You'd need about ${need.toFixed(1)} here.`});
     }
   }
 

@@ -1,6 +1,9 @@
 /* ---------- Aurora Radar ---------- */
 // Place searches on OpenStreetMap data (Photon): query, OSM tag, label, base score
-const SPOT_SEARCHES=[["nature reserve","leisure:nature_reserve","Nature reserve",2],["state park","leisure:park","Park",1.5],["national park","boundary:national_park","National park",3],["dark sky park","","Dark-sky place",6]];
+// Local words too, since reserves and parks are named in the local language (Norwegian, Swedish/Danish, Finnish)
+const SPOT_SEARCHES=[["nature reserve","leisure:nature_reserve","Nature reserve",2],["naturreservat","leisure:nature_reserve","Nature reserve",2],
+  ["national park","boundary:national_park","National park",3],["nasjonalpark","boundary:national_park","National park",3],["nationalpark","boundary:national_park","National park",3],["kansallispuisto","boundary:national_park","National park",3],
+  ["state park","leisure:park","Park",1.5],["dark sky park","","Dark-sky place",6]];
 const RANGE_KM=2000;
 
 function distKm(a1,o1,a2,o2){
@@ -90,7 +93,7 @@ const Aurora={
     const rows=[];
     if(ch){
       const st=ch.kpMax>=ch.need+1?"good":ch.kpMax>=ch.need-1?"fair":"poor";
-      rows.push({name:"Aurora activity",st,text:`Up to Kp ${ch.kpMax.toFixed(0)} tonight. About ${Math.min(9,Math.ceil(ch.need))} is needed here.`,meter:ch.kpMax/9,mark:Math.min(1,ch.need/9)});
+      rows.push({name:"Aurora activity",st,text:`Up to Kp ${ch.kpMax.toFixed(1)} tonight. About ${Math.min(9,ch.need).toFixed(1)} is needed here.`,meter:ch.kpMax/9,mark:Math.min(1,ch.need/9)});
     }
     const dk=S.wx?S.wx.filter(h=>h.t>=w.dusk&&h.t<=w.dawn):[];
     if(dk.length){
@@ -150,7 +153,7 @@ const Aurora={
       g+=`<rect x="${L+i*bw}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-i="${i}"><title>${fmt(r.t)}: Kp ${r.kp.toFixed(1)}</title></rect>`;
     });
     const ny=y(Math.min(9,need));
-    if(need<=9)g+=`<line x1="${L}" x2="${W}" y1="${ny}" y2="${ny}" stroke="var(--fg)" stroke-dasharray="4 4" opacity=".7"/><text x="${W-2}" y="${ny-5}" text-anchor="end" class="axb">needed here ≈ ${Math.ceil(need)}</text>`;
+    if(need<=9)g+=`<line x1="${L}" x2="${W}" y1="${ny}" y2="${ny}" stroke="var(--fg)" stroke-dasharray="4 4" opacity=".7"/><text x="${W-2}" y="${ny-5}" text-anchor="end" class="axb">needed here ≈ ${need.toFixed(1)}</text>`;
     const ni=rows.findIndex(r=>Date.now()>=r.t&&Date.now()<r.t+3*3600e3);
     if(ni>=0){const nx=L+(ni+(Date.now()-rows[ni].t)/(3*3600e3))*bw;g+=`<line x1="${nx}" x2="${nx}" y1="${T-6}" y2="${y(0)}" stroke="#ffcf6b" stroke-width="1.5"/><text x="${nx+3}" y="${T-1}" class="axb">now</text>`}
     el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kp forecast for the next three days">${g}</svg>`;
@@ -166,7 +169,7 @@ const Aurora={
     const key=`${S.lat.toFixed(2)},${S.lon.toFixed(2)}`;
     if(this.spotsKey===key&&this.spotsState!=="error")return;
     this.spotsKey=key;this.spots=null;this.spotsState="loading";this.renderSpots();
-    const cached=store.get("sky-spots");
+    const cached=store.get("sky-spots2");
     if(cached&&cached.key===key&&Date.now()-cached.t<7*864e5){this.spots=cached.list;this.spotsState="ok";this.renderSpots();return}
     const found=await Promise.all(SPOT_SEARCHES.map(async([q,tag,kind,w])=>{
       const ctrl=new AbortController(),to=setTimeout(()=>ctrl.abort(),12000);
@@ -181,7 +184,7 @@ const Aurora={
     if(this.spotsKey!==key)return;
     if(found.every(f=>f===null)){this.spotsState="error";this.renderSpots();return}
     this.spots=rankSpots(found.flat().filter(Boolean));this.spotsState="ok";
-    store.set("sky-spots",{key,t:Date.now(),list:this.spots});
+    store.set("sky-spots2",{key,t:Date.now(),list:this.spots});
     this.renderSpots();
   },
   renderSpots(){
@@ -198,14 +201,15 @@ const Aurora={
       :`<li class="note">No mapped parks or reserves within 150 km.</li>`)+advice;
   }
 };
-// Score places: dark-sky sites first, then farther from town lights and toward the aurora
+// Score places: toward the aurora first, then darker (farther from town) and dark-sky sites
 function rankSpots(list){
   const hz=hemi().az,seen=new Set(),out=[];
   for(const x of list){
     if(!x.n||seen.has(x.n))continue;seen.add(x.n);
     const d=distKm(S.lat,S.lon,x.lat,x.lon),b=bearing(S.lat,S.lon,x.lat,x.lon);
     if(d>150)continue;
-    const sc=x.w+Math.min(d,80)/16-(d<15?3:0)+1.5*Math.cos((b-hz)*D2R);
+    // toward the aurora matters most; distance helps up to ~50 km, then becomes a long drive
+    const sc=x.w+Math.min(d,50)/12.5-(d<15?3:0)-Math.max(0,d-100)/25+3*Math.cos((b-hz)*D2R);
     out.push({n:x.n,kind:x.kind,lat:x.lat,lon:x.lon,d,b,sc});
   }
   return out.sort((a,b)=>b.sc-a.sc).slice(0,5);
