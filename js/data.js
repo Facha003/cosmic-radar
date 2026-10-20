@@ -247,10 +247,14 @@ const CITIES=[
 // Famous things to find, best known first. The "up now" list follows this order.
 // s: star ids (from STARS); l: lines to draw, or "con" to use the whole constellation's lines
 const SIGHTS=[
+ {id:"venus",n:"Venus",kind:"Planet",planet:"venus",tip:"The brightest thing in the sky after the Moon. A dazzling steady light near where the Sun set or will rise."},
+ {id:"jupiter",n:"Jupiter",kind:"Planet",planet:"jupiter",tip:"A very bright, steady, cream-colored light. Binoculars show up to four of its moons as tiny dots in a line."},
  {id:"dipper",n:"Big Dipper",kind:"Star pattern",con:"UMa",s:["dub","mer","phe","meg","ali","miz","alkd"],l:[["alkd","miz"],["miz","ali"],["ali","meg"],["meg","dub"],["dub","mer"],["mer","phe"],["phe","meg"]],
   tip:"Seven bright stars shaped like a ladle. The two stars at the end of the bowl point to Polaris."},
  {id:"belt",n:"Orion's Belt",kind:"Star pattern",con:"Ori",s:["alk","aln","min"],l:[["alk","aln"],["aln","min"]],
   tip:"Three bright stars in a short, straight row across the middle of Orion."},
+ {id:"saturn",n:"Saturn",kind:"Planet",planet:"saturn",tip:"A steady, pale gold light that doesn't twinkle. Any small telescope shows its rings."},
+ {id:"mars",n:"Mars",kind:"Planet",planet:"mars",tip:"A steady orange-red light. Its brightness changes a lot from year to year."},
  {id:"m45",n:"The Pleiades",kind:"Star cluster",con:"Tau",s:["m45"],
   tip:"A tiny misty dipper of stars, also called the Seven Sisters. Look just beside it and more stars appear."},
  {id:"polaris",n:"Polaris, the North Star",kind:"Star",con:"UMi",s:["polaris"],
@@ -293,6 +297,41 @@ const SIGHTS=[
   tip:"The second-brightest star in the night sky, seen from the south."},
  {id:"m44",n:"Beehive Cluster",kind:"Star cluster",con:"Cnc",s:["m44"],
   tip:"A misty patch between Gemini and Leo. Binoculars turn it into a swarm of stars."},
+ {id:"mercury",n:"Mercury",kind:"Planet",planet:"mercury",tip:"Hard to catch: low in the twilight, just after sunset or before sunrise."},
  {id:"m13",n:"Hercules Cluster",kind:"Star cluster",con:"Her",s:["m13"],
   tip:"A faint fuzzy ball of hundreds of thousands of stars. Best with binoculars."}
+];
+
+// Major meteor showers: peak and active dates (month, day; they shift by a day or so each year), meteors per hour in a dark sky, radiant RA/Dec in degrees
+const SHOWERS=[
+ {n:"Quadrantid",peak:[1,3],from:[12,28],to:[1,12],rate:110,ra:230,dec:49,from_:"Boötes"},
+ {n:"Lyrid",peak:[4,22],from:[4,14],to:[4,30],rate:18,ra:271,dec:34,from_:"Lyra"},
+ {n:"Eta Aquariid",peak:[5,6],from:[4,19],to:[5,28],rate:50,ra:338,dec:-1,from_:"Aquarius"},
+ {n:"Delta Aquariid",peak:[7,30],from:[7,12],to:[8,23],rate:25,ra:340,dec:-16,from_:"Aquarius"},
+ {n:"Perseid",peak:[8,12],from:[7,17],to:[8,24],rate:100,ra:48,dec:58,from_:"Perseus"},
+ {n:"Draconid",peak:[10,8],from:[10,6],to:[10,10],rate:10,ra:262,dec:54,from_:"Draco"},
+ {n:"Orionid",peak:[10,21],from:[10,2],to:[11,7],rate:20,ra:95,dec:16,from_:"Orion"},
+ {n:"Leonid",peak:[11,17],from:[11,6],to:[11,30],rate:15,ra:152,dec:22,from_:"Leo"},
+ {n:"Geminid",peak:[12,14],from:[12,4],to:[12,20],rate:150,ra:112,dec:33,from_:"Gemini"},
+ {n:"Ursid",peak:[12,22],from:[12,17],to:[12,26],rate:10,ra:217,dec:76,from_:"Ursa Minor"}
+];
+
+// Eclipses (NASA, time of greatest eclipse in UT). Penumbral lunar eclipses are left out: they are hard to notice.
+const ECLIPSES=[
+ {t:"2027-02-06T16:00Z",type:"annular solar",where:"Chile, Argentina and the South Atlantic, with a partial eclipse across South America and western Africa"},
+ {t:"2027-08-02T10:07Z",type:"total solar",where:"Spain, Morocco, Egypt and Saudi Arabia, with a partial eclipse across Europe, Africa and the Middle East"},
+ {t:"2028-01-12T04:13Z",type:"partial lunar"},
+ {t:"2028-01-26T15:08Z",type:"annular solar",where:"Ecuador, Peru, Brazil, Spain and Portugal, with a partial eclipse across the Americas and western Europe"},
+ {t:"2028-07-06T18:20Z",type:"partial lunar"},
+ {t:"2028-07-22T02:55Z",type:"total solar",where:"Australia and New Zealand, with a partial eclipse across Southeast Asia"},
+ {t:"2028-12-31T16:52Z",type:"total lunar"},
+ {t:"2029-01-14T17:12Z",type:"partial solar",where:"North and Central America"},
+ {t:"2029-06-12T04:05Z",type:"partial solar",where:"the Arctic, Scandinavia, Alaska and northern Canada"},
+ {t:"2029-06-26T03:22Z",type:"total lunar"},
+ {t:"2029-07-11T15:36Z",type:"partial solar",where:"southern Chile and Argentina"},
+ {t:"2029-12-05T15:03Z",type:"partial solar",where:"southern Argentina and Chile"},
+ {t:"2029-12-20T22:42Z",type:"total lunar"},
+ {t:"2030-06-01T06:28Z",type:"annular solar",where:"North Africa, Greece, Turkey, Russia, northern China and Japan, with a partial eclipse across Europe and Asia"},
+ {t:"2030-06-15T18:33Z",type:"partial lunar"},
+ {t:"2030-11-25T06:50Z",type:"total solar",where:"Botswana, South Africa and Australia"}
 ];

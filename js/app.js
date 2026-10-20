@@ -18,11 +18,15 @@ for(const k in CONS){const c=CONS[k];c.br=c.stars.slice().sort((a,b)=>STARS[a][4
 // Fill in each famous sight's stars, lines, center and brightest star
 const SIGHT={};
 for(const x of SIGHTS){
+  SIGHT[x.id]=x;
+  if(x.planet)continue; // planets move, so their place is set each night in computeNight
   if(x.l==="con"){x.l=CONS[x.con].l;x.s=[...new Set(x.l.flat())]}
   x.c=x.s.length>1?centroid(x.s):{ra:STARS[x.s[0]][2]*15,dec:STARS[x.s[0]][3]};
   x.br=x.s.slice().sort((a,b)=>STARS[a][4]-STARS[b][4])[0];
-  SIGHT[x.id]=x;
 }
+const PCOL={mercury:"#c9c1b5",venus:"#fff6d8",mars:"#ff9a6a",jupiter:"#ffe9c4",saturn:"#f3dca0"};
+// Planets lost in the Sun's glare are left out
+const inGlare=x=>x.planet&&x.pp.elong<12;
 
 /* location */
 function initCities(){
@@ -75,6 +79,8 @@ function nowOrDusk(){const n=Date.now();return S.mode==="dark"&&n<S.win.dusk?S.w
 function computeNight(){
   const w=nightWindow(Date.now(),S.lat,S.lon,S.tz);S.win=w;
   S.sums={};
+  const mid=(w.dusk+w.dawn)/2;
+  for(const x of SIGHTS)if(x.planet){x.pp=planetPos(x.planet,mid);x.c={ra:x.pp.ra,dec:x.pp.dec}}
   for(const x of SIGHTS)S.sums[x.id]=track(x.c.ra,x.c.dec,w,S.lat,S.lon);
   const ph=moonPhase((w.dusk+w.dawn)/2);
   let upCount=0,n=0,rise=null,set=null,prev=null;
@@ -86,7 +92,7 @@ function computeNight(){
   renderAll();
 }
 function renderAll(){
-  renderConditions();renderList();renderFinder();
+  renderConditions();renderSpecial();renderList();renderFinder();
   $("slider").value=Math.round((S.t-S.win.sunset)/300000);$("tLabel").textContent=fmt(S.t);
   if($("mapBox").open)renderMap();
 }
@@ -120,7 +126,7 @@ async function loadWeather(){
 
 /* up now list */
 function upNow(){
-  return SIGHTS.map(x=>({x,p:altaz(x.c.ra,x.c.dec,S.t,S.lat,S.lon)})).filter(o=>o.p.alt>=VIS);
+  return SIGHTS.map(x=>({x,p:altaz(x.c.ra,x.c.dec,S.t,S.lat,S.lon)})).filter(o=>o.p.alt>=VIS&&!inGlare(o.x));
 }
 function whenLabel(){
   if(!S.live)return `Up at ${fmt(S.t)}`;
@@ -145,7 +151,7 @@ function renderList(){
   $("moreBtn").textContent=S.more?"Show fewer":`Show ${up.length-6} more`;
   // A few famous ones still to come
   const upSet=new Set(up.map(o=>o.x.id));
-  const later=SIGHTS.filter(x=>!upSet.has(x.id)).map(x=>{const r=S.sums[x.id].find(p=>p.t>S.t&&p.alt>=VIS);return r&&{x,t:r.t}})
+  const later=SIGHTS.filter(x=>!upSet.has(x.id)&&!inGlare(x)).map(x=>{const r=S.sums[x.id].find(p=>p.t>S.t&&p.alt>=VIS);return r&&{x,t:r.t}})
     .filter(Boolean).slice(0,3).sort((a,b)=>a.t-b.t);
   $("later").hidden=!later.length;
   $("later").innerHTML=later.length?"Later tonight: "+later.map(o=>`<button class="link" type="button" data-s="${o.x.id}">${esc(o.x.n)}</button> after ${fmt(o.t)}`).join(", "):"";
@@ -172,7 +178,11 @@ function renderFinder(){
   S.tp=altaz(rd.ra,rd.dec,S.t,S.lat,S.lon);
   const r=track(rd.ra,rd.dec,S.win,S.lat,S.lon).find(p=>p.t>S.t&&p.alt>=VIS);S.tRise=r?r.t:null;
   let kind,name,tip,more,shape;
-  if(sel.type==="sight"){
+  if(sel.type==="sight"&&SIGHT[sel.id].planet){
+    const x=SIGHT[sel.id],near=nearby(x.c,22);
+    kind="Planet";name=x.n;tip=x.tip;more=morePlanet(x);
+    shape={center:x.c,lines:[],faint:near.lines,ids:near.ids,ring:[],label:near.label,extra:[{ra:x.c.ra,dec:x.c.dec,name:x.n,color:PCOL[x.planet]}]};
+  }else if(sel.type==="sight"){
     const x=SIGHT[sel.id],one=x.s.length===1?x.s[0]:null;
     kind=x.kind+(c?` in ${c.n}`:"");name=x.n;tip=x.tip;
     more=one?moreStar(one,true):moreSight(x);
@@ -245,10 +255,11 @@ function shapeSvg(o,name){
   const ul=Math.hypot(...up);up=ul<1e-3?[0,1,0]:up.map(x=>x/ul);
   const rt=cross(cv,up);
   const pr=(alt,az)=>{const v=vec({alt,az}),z=dot(v,cv);return z>.2?[dot(v,rt)/z,-dot(v,up)/z]:null};
-  const faint=o.faint||[],ids=new Set([...o.lines.flat(),...faint.flat(),...o.ring]);
+  const faint=o.faint||[],ids=new Set([...o.lines.flat(),...faint.flat(),...o.ring,...(o.ids||[])]);
   const P={};
   for(const id of ids){const s=STARS[id],a=altaz(s[2]*15,s[3],S.t,S.lat,S.lon),q=pr(a.alt,a.az);if(q)P[id]=q}
-  const xs=Object.values(P).map(q=>q[0]),ys=Object.values(P).map(q=>q[1]);
+  const ex=(o.extra||[]).map(e=>{const a=altaz(e.ra,e.dec,S.t,S.lat,S.lon);return {...e,q:pr(a.alt,a.az)}}).filter(e=>e.q);
+  const pts=[...Object.values(P),...ex.map(e=>e.q)],xs=pts.map(q=>q[0]),ys=pts.map(q=>q[1]);
   if(!xs.length)return "";
   const W=300,H=190,pad=24,cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
   const sc=Math.min((W-2*pad)/Math.max(.05,Math.max(...xs)-Math.min(...xs)),(H-2*pad)/Math.max(.05,Math.max(...ys)-Math.min(...ys)),900);
@@ -268,6 +279,7 @@ function shapeSvg(o,name){
     if(o.ring.includes(id))g+=`<circle cx="${x}" cy="${y}" r="${(r+5).toFixed(1)}" fill="none" stroke="var(--gilt)" stroke-width="1.5"/>`;
     if(o.label.includes(id))g+=`<text x="${(+x+r+(o.ring.includes(id)?8:4)).toFixed(1)}" y="${(+y+4).toFixed(1)}" fill="var(--fg)" font-size="12" font-family="var(--body)">${esc(s[0].replace(/ \(M\d+\)/,""))}</text>`;
   }
+  for(const e of ex)g+=`<circle cx="${X(e.q)}" cy="${Y(e.q)}" r="5.5" fill="${e.color}"/><text x="${(+X(e.q)+10).toFixed(1)}" y="${(+Y(e.q)+4).toFixed(1)}" fill="var(--gilt)" font-size="13" font-weight="700" font-family="var(--body)">${esc(e.name)}</text>`;
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(name)} as it looks right now">${g}</svg>`;
 }
 
@@ -294,6 +306,19 @@ function moreStar(id,withFact){
     <div class="chips"><button class="chip" type="button" data-con="${s[1]}">The constellation ${esc(CONS[s[1]].n)}</button></div>`;
 }
 
+// Bright stars around a point, with any constellation lines between them
+function nearby(c,rad){
+  const ids=Object.keys(STARS).filter(id=>!isDeep(id)&&STARS[id][4]<3.5&&sep(c.ra,c.dec,STARS[id][2]*15,STARS[id][3])<rad),set=new Set(ids),lines=[];
+  for(const k in CONS)for(const l of CONS[k].l)if(set.has(l[0])&&set.has(l[1]))lines.push(l);
+  return {ids,lines,label:ids.slice().sort((a,b)=>STARS[a][4]-STARS[b][4]).slice(0,2)};
+}
+function morePlanet(x){
+  const p=x.pp,km=p.dist*149.6,min=p.dist*8.317;
+  return `<dl class="facts"><dt>Distance now</dt><dd>${Math.round(km).toLocaleString()} million km</dd>
+    <dt>Its light left</dt><dd>${min<90?`${Math.round(min)} minutes ago`:`${(min/60).toFixed(1)} hours ago`}</dd>
+    <dt>Brightness</dt><dd>${esc(seeIt(p.mag))}</dd></dl>
+    <p class="note">Planets shine with a steady light. Stars twinkle.</p>`;
+}
 function moreSight(x){
   const named=x.s.filter(id=>!/^[α-ω]/.test(STARS[id][0])).sort((a,b)=>STARS[a][4]-STARS[b][4]);
   return `<p class="note">Its stars</p><div class="chips">${named.map(id=>`<button class="chip" type="button" data-star="${id}">${esc(STARS[id][0])}</button>`).join("")}</div>
@@ -337,6 +362,11 @@ function renderMap(){
     else{const r=starR(s[4]);g+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="${SPC[s[5][0]]||"#fff"}"/>`;if(s[4]<1.3)g+=`<text x="${(x+r+3).toFixed(1)}" y="${(y+3.5).toFixed(1)}" fill="#c9d3e8" font-size="10.5" font-family="var(--body)">${esc(s[0])}</text>`}
     if(sel)g+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9" fill="none" stroke="var(--gilt)" stroke-width="1.5"/>`;
   }
+  for(const x of SIGHTS)if(x.planet){
+    const pp=planetPos(x.planet,t),a=altaz(pp.ra,pp.dec,t,S.lat,S.lon);if(a.alt<0)continue;
+    const [px,py]=proj(a.alt,a.az);mapPts.push({id:"planet:"+x.id,x:px,y:py,m:-1});
+    g+=`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="${PCOL[x.planet]}"/><text x="${(px+8).toFixed(1)}" y="${(py+4).toFixed(1)}" fill="${PCOL[x.planet]}" font-size="11.5" font-weight="700" font-family="var(--body)">${x.n}</text>`;
+  }
   const mp=moonAltAz(t,S.lat,S.lon);
   if(mp.alt>0){const [x,y]=proj(mp.alt,mp.az);g+=`<g>${moonSvg(S.phase,x,y,9)}</g><text x="${x+12}" y="${y+4}" fill="#efe7cf" font-size="11" font-family="var(--body)">Moon</text>`}
   for(const k in CONS){
@@ -353,7 +383,7 @@ function mapClick(e){
   const p=pt.matrixTransform(svg.getScreenCTM().inverse());
   let best=null,bd=1e9;
   for(const s of mapPts){const d=Math.hypot(s.x-p.x,s.y-p.y)-(5-s.m);if(d<bd){bd=d;best=s}}
-  if(best&&bd<14){select("star",best.id,true);return}
+  if(best&&bd<14){if(best.id.startsWith("planet:"))select("sight",best.id.slice(7),true);else select("star",best.id,true);return}
   let bl=null,bld=1e9;for(const l of labelPts){const d=Math.hypot(l.x-p.x,l.y+10-p.y);if(d<bld){bld=d;bl=l}}
   if(bl&&bld<40)select("con",bl.k,true);
 }
@@ -394,4 +424,5 @@ if(saved&&typeof saved.lat==="number"){setLoc(saved.lat,saved.lon,saved.tz||brow
 else{const c=CITIES.find(c=>c[3]===browserTz)||CITIES[0];setLoc(c[1],c[2],c[3],c[0],true);store.set("sky-loc",null);showChooser(true)}
 // Keep "up now" current while the page is open
 setInterval(()=>{if(S.live&&!document.hidden){S.t=nowOrDusk();renderAll()}},30000);
+loadAurora();setInterval(loadAurora,30*60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.live)computeNight()});
