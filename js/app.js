@@ -1,6 +1,6 @@
 /* ---------- UI ---------- */
 const $=id=>document.getElementById(id);
-const HOSTED=""; // GitHub Pages address, opened from the claude.ai copy for location
+const HOSTED="https://facha003.github.io/tonights-sky-atlas/"; // GitHub Pages address, opened from the claude.ai copy for location
 const S={lat:40.71,lon:-74.01,tz:"America/New_York",label:"New York",t:Date.now(),sel:null,filter:"vis",wx:null,win:null,sums:{}};
 const browserTz=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch(e){return "UTC"}})();
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
