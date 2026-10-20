@@ -35,7 +35,13 @@
 
   <div class="main">
     <section class="up" aria-labelledby="listHead">
-      <h2 id="listHead">Up now</h2>
+      <div class="uphead">
+        <h2 id="listHead">Up now</h2>
+        <div class="seg" id="modeSeg" role="group" aria-label="Which sky to show" hidden>
+          <button type="button" data-mode="dark" aria-pressed="true">When it's dark</button>
+          <button type="button" data-mode="now" aria-pressed="false">Right now</button>
+        </div>
+      </div>
       <ul class="list" id="list"></ul>
       <button class="link" id="moreBtn" type="button" hidden></button>
       <p class="later note" id="later" hidden></p>

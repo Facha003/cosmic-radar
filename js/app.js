@@ -1,9 +1,9 @@
 /* ---------- UI ---------- */
 const $=id=>document.getElementById(id);
 const HOSTED="https://facha003.github.io/tonights-sky-atlas/"; // GitHub Pages address, opened from the claude.ai copy for location
-const S={lat:40.71,lon:-74.01,tz:"America/New_York",label:"New York",t:Date.now(),live:true,sel:null,more:false,wx:null,win:null,sums:{}};
-const browserTz=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch(e){return "UTC"}})();
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const S={lat:40.71,lon:-74.01,tz:"America/New_York",label:"New York",t:Date.now(),live:true,mode:store.get("sky-mode")==="now"?"now":"dark",sel:null,more:false,wx:null,win:null,sums:{}};
+const browserTz=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch(e){return "UTC"}})();
 
 function fmt(t){return new Intl.DateTimeFormat(undefined,{hour:"numeric",minute:"2-digit",timeZone:S.tz}).format(new Date(t))}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
@@ -13,8 +13,9 @@ const dir8=az=>DIR8[Math.round(norm(az)/45)%8];
 const heightWord=alt=>alt>=75?"overhead":alt>=50?"high up":alt>=25?"halfway up":"low";
 const reduceMotion=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// Brightest star of each constellation: brighter patterns are easier to find, so they go first
-for(const k in CONS){const c=CONS[k];c.br=c.stars.slice().sort((a,b)=>STARS[a][4]-STARS[b][4])[0];c.mag=STARS[c.br][4]}
+// Brightest star of each constellation, and its place in the famous-first order
+for(const k in CONS){const c=CONS[k];c.br=c.stars.slice().sort((a,b)=>STARS[a][4]-STARS[b][4])[0];const i=FAMOUS.indexOf(k);c.rank=i<0?99:i}
+const byFame=(a,b)=>CONS[a.k].rank-CONS[b.k].rank;
 
 /* location */
 function initCities(){
@@ -62,8 +63,8 @@ function setLoc(lat,lon,tz,label,quiet){
 }
 
 /* night */
-// Before dark, show the sky as it will be at dusk
-function nowOrDusk(){const n=Date.now();return n<S.win.dusk?S.win.dusk:n}
+// Before dark, show the sky as it will be at dusk, unless "Right now" is chosen
+function nowOrDusk(){const n=Date.now();return S.mode==="dark"&&n<S.win.dusk?S.win.dusk:n}
 function computeNight(){
   const w=nightWindow(Date.now(),S.lat,S.lon,S.tz);S.win=w;
   S.sums={};
@@ -113,11 +114,12 @@ async function loadWeather(){
 /* up now list */
 function upNow(){
   return Object.keys(CONS).map(k=>({k,p:altaz(CONS[k].c.ra,CONS[k].c.dec,S.t,S.lat,S.lon)}))
-    .filter(o=>o.p.alt>=VIS).sort((a,b)=>CONS[a.k].mag-CONS[b.k].mag);
+    .filter(o=>o.p.alt>=VIS).sort(byFame);
 }
 function whenLabel(){
   if(!S.live)return `Up at ${fmt(S.t)}`;
-  return Date.now()<S.win.dusk?`Up once it's dark (${fmt(S.win.dusk)})`:"Up now";
+  if(Date.now()<S.win.dusk&&S.mode==="dark")return `Up once it's dark (${fmt(S.win.dusk)})`;
+  return `Up now · ${fmt(S.t)}`+(Date.now()<S.win.dusk?" (still light out)":"");
 }
 const selCon=()=>S.sel?(S.sel.type==="con"?S.sel.id:STARS[S.sel.id][1]):null;
 function arrowSvg(az){return `<svg class="arrow" viewBox="-12 -12 24 24" data-az="${az.toFixed(1)}" aria-hidden="true"><circle r="11" fill="none" stroke="var(--line)"/><path d="M0 -8L5 6L0 3L-5 6Z" fill="var(--gilt)"/></svg>`}
@@ -127,6 +129,9 @@ function renderList(){
   const up=upNow(),shown=S.more?up:up.slice(0,6);
   if(!S.sel&&up.length)S.sel={type:"con",id:up[0].k};
   $("listHead").textContent=whenLabel();
+  // The choice only matters before dark
+  $("modeSeg").hidden=Date.now()>=S.win.dusk;
+  $("modeSeg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===S.mode)));
   const sk=selCon();
   $("list").innerHTML=shown.map(({k,p})=>`<li><button type="button" class="row${k===sk?" sel":""}" data-k="${k}">${p.alt>=75?overheadSvg():arrowSvg(p.az)}<span class="nm">${esc(CONS[k].n)}</span><span class="where">${p.alt>=75?"Straight overhead":`${cap(dir8(p.az))} · ${heightWord(p.alt)}`}</span></button></li>`).join("")
     ||`<li class="empty">Nothing is high enough to see easily right now.</li>`;
@@ -135,7 +140,7 @@ function renderList(){
   // A few bright ones still to come
   const upSet=new Set(up.map(o=>o.k));
   const later=Object.keys(CONS).filter(k=>!upSet.has(k)).map(k=>{const r=S.sums[k].tr.find(p=>p.t>S.t&&p.alt>=VIS);return r&&{k,t:r.t}})
-    .filter(Boolean).sort((a,b)=>CONS[a.k].mag-CONS[b.k].mag).slice(0,3).sort((a,b)=>a.t-b.t);
+    .filter(Boolean).sort(byFame).slice(0,3).sort((a,b)=>a.t-b.t);
   $("later").hidden=!later.length;
   $("later").innerHTML=later.length?"Later tonight: "+later.map(o=>`<button class="link" type="button" data-k="${o.k}">${esc(CONS[o.k].n)}</button> after ${fmt(o.t)}`).join(", "):"";
   document.querySelectorAll("#list [data-k], #later [data-k]").forEach(b=>b.onclick=()=>select("con",b.dataset.k,true));
@@ -343,6 +348,7 @@ function initCompass(){
 /* boot */
 initCities();initCompass();
 $("moreBtn").onclick=()=>{S.more=!S.more;renderList()};
+$("modeSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;store.set("sky-mode",S.mode);setTime(nowOrDusk(),true)});
 $("slider").addEventListener("input",e=>setTime(S.win.sunset+e.target.value*300000,false));
 $("nowBtn").onclick=()=>setTime(nowOrDusk(),true);
 $("map").addEventListener("click",mapClick);
@@ -353,5 +359,5 @@ const saved=store.get("sky-loc");
 if(saved&&typeof saved.lat==="number"){setLoc(saved.lat,saved.lon,saved.tz||browserTz,saved.label||"Saved location",true);showChooser(false)}
 else{const c=CITIES.find(c=>c[3]===browserTz)||CITIES[0];setLoc(c[1],c[2],c[3],c[0],true);store.set("sky-loc",null);showChooser(true)}
 // Keep "up now" current while the page is open
-setInterval(()=>{if(S.live&&!document.hidden){S.t=nowOrDusk();renderAll()}},60000);
+setInterval(()=>{if(S.live&&!document.hidden){S.t=nowOrDusk();renderAll()}},30000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.live)computeNight()});

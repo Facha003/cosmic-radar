@@ -243,3 +243,6 @@ const CITIES=[
 ["Tokyo",35.68,139.69,"Asia/Tokyo"],["Perth",-31.95,115.86,"Australia/Perth"],["Sydney",-33.87,151.21,"Australia/Sydney"],["Melbourne",-37.81,144.96,"Australia/Melbourne"],["Auckland",-36.85,174.76,"Pacific/Auckland"]
 ];
 
+
+// Best-known constellations first; the "up now" list follows this order
+const FAMOUS=["Ori","UMa","Cas","Sco","Cru","UMi","Cyg","Leo","Tau","Gem","Lyr","Sgr","Peg","And","Per","CMa","Aql","Boo","Vir","Cen","Dra","Her","Aur","Ari","Cnc","Cap","Aqr","Lib","CrB","Del","Cep","CMi","Oph","Car","Crv","Hya","Eri","PsA"];
