@@ -4,7 +4,39 @@
 const SPOT_SEARCHES=[["nature reserve","leisure:nature_reserve","Nature reserve",2],["naturreservat","leisure:nature_reserve","Nature reserve",2],
   ["national park","boundary:national_park","National park",3],["nasjonalpark","boundary:national_park","National park",3],["nationalpark","boundary:national_park","National park",3],["kansallispuisto","boundary:national_park","National park",3],
   ["state park","leisure:park","Park",1.5],["dark sky park","","Dark-sky place",6]];
+// Backup when Photon is down: OpenStreetMap's Nominatim. Its English category words work in any country.
+// Nominatim allows about one request a second, so these run one after another: query, label, base score
+const NOMINATIM_SEARCHES=[["viewpoint","Viewpoint",2.5],["nature reserve","Nature reserve",2],["national park","National park",3]];
 const RANGE_KM=2000;
+async function getJSON(url,ms){
+  const ctrl=new AbortController(),to=setTimeout(()=>ctrl.abort(),ms);
+  try{const r=await fetch(url,{signal:ctrl.signal});if(!r.ok)throw new Error(r.status);return await r.json()}
+  finally{clearTimeout(to)}
+}
+// Each returns a list of {n,lat,lon,kind,w}, or null if the service couldn't be reached at all
+async function photonSpots(){
+  const found=await Promise.all(SPOT_SEARCHES.map(async([q,tag,kind,w])=>{
+    try{
+      const j=await getJSON(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${S.lat.toFixed(3)}&lon=${S.lon.toFixed(3)}&limit=30${tag?`&osm_tag=${tag}`:""}`,8000);
+      return (j.features||[]).filter(f=>tag||/dark.?sky/i.test(f.properties.name||"")&&["leisure","boundary","tourism"].includes(f.properties.osm_key))
+        .map(f=>({n:f.properties.name,lon:f.geometry.coordinates[0],lat:f.geometry.coordinates[1],kind,w}));
+    }catch(e){return null}
+  }));
+  return found.every(f=>f===null)?null:found.flat().filter(Boolean);
+}
+async function nominatimSpots(){
+  const dLat=1.35,dLon=Math.min(60,1.35/Math.max(.1,Math.cos(S.lat*D2R))); // a box about 150 km each way
+  const box=[S.lon-dLon,S.lat+dLat,S.lon+dLon,S.lat-dLat].map(v=>v.toFixed(3)).join(",");
+  let out=null;
+  for(const [i,[q,kind,w]] of NOMINATIM_SEARCHES.entries()){
+    if(i)await new Promise(r=>setTimeout(r,1100));
+    try{
+      const j=await getJSON(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=30&bounded=1&viewbox=${box}`,8000);
+      out=(out||[]).concat(j.filter(x=>x.name).map(x=>({n:x.name,lat:+x.lat,lon:+x.lon,kind,w})));
+    }catch(e){}
+  }
+  return out;
+}
 
 function distKm(a1,o1,a2,o2){
   const p1=a1*D2R,p2=a2*D2R,dp=p2-p1,dl=(o2-o1)*D2R;
@@ -181,21 +213,15 @@ const Aurora={
     if(this.spotsKey===key&&this.spotsState!=="error")return;
     this.spotsKey=key;this.spots=null;this.spotsState="loading";this.renderSpots();
     const cached=store.get("sky-spots2");
-    if(cached&&cached.key===key&&Date.now()-cached.t<7*864e5){this.spots=cached.list;this.spotsState="ok";this.renderSpots();return}
-    const found=await Promise.all(SPOT_SEARCHES.map(async([q,tag,kind,w])=>{
-      const ctrl=new AbortController(),to=setTimeout(()=>ctrl.abort(),12000);
-      try{
-        const r=await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${S.lat.toFixed(3)}&lon=${S.lon.toFixed(3)}&limit=30${tag?`&osm_tag=${tag}`:""}`,{signal:ctrl.signal});
-        if(!r.ok)throw new Error(r.status);
-        const j=await r.json();
-        return (j.features||[]).filter(f=>tag||/dark.?sky/i.test(f.properties.name||"")&&["leisure","boundary","tourism"].includes(f.properties.osm_key))
-          .map(f=>({n:f.properties.name,lon:f.geometry.coordinates[0],lat:f.geometry.coordinates[1],kind,w}));
-      }catch(e){return null}finally{clearTimeout(to)}
-    }));
+    if(cached&&cached.key===key&&cached.list.length&&Date.now()-cached.t<7*864e5){this.spots=cached.list;this.spotsState="ok";this.renderSpots();return}
+    let list=await photonSpots();
     if(this.spotsKey!==key)return;
-    if(found.every(f=>f===null)){this.spotsState="error";this.renderSpots();return}
-    this.spots=rankSpots(found.flat().filter(Boolean));this.spotsState="ok";
-    store.set("sky-spots2",{key,t:Date.now(),list:this.spots});
+    // Photon down, or nothing useful nearby: ask Nominatim
+    if(!list||!rankSpots(list).length){const more=await nominatimSpots();if(this.spotsKey!==key)return;if(more)list=(list||[]).concat(more)}
+    if(!list){this.spotsState="error";this.renderSpots();return}
+    this.spots=rankSpots(list);this.spotsState="ok";
+    // only keep a list that found something, so one bad answer isn't stuck for a week
+    if(this.spots.length)store.set("sky-spots2",{key,t:Date.now(),list:this.spots});
     this.renderSpots();
   },
   renderSpots(){
@@ -217,6 +243,7 @@ function rankSpots(list){
   const hz=hemi().az,seen=new Set(),out=[];
   for(const x of list){
     if(!x.n||seen.has(x.n))continue;seen.add(x.n);
+    if(/\bmarin/i.test(x.n))continue; // marine reserves are out at sea
     const d=distKm(S.lat,S.lon,x.lat,x.lon),b=bearing(S.lat,S.lon,x.lat,x.lon);
     if(d>150)continue;
     // toward the aurora matters most; distance helps up to ~50 km, then becomes a long drive

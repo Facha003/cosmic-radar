@@ -64,7 +64,7 @@ js/aurora.js    Aurora Radar: chance score, NOAA aurora map, Kp chart, viewing s
 js/app.js       location, tabs, weather, info card, compass finder, startup
 ```
 
-Live data: cloud cover from Open-Meteo, Kp forecast and aurora map from NOAA SWPC, satellite orbits from CelesTrak, places from OpenStreetMap via Photon. No API keys. Everything else is calculated on the device, and your location is only sent, rounded to about 100 m, to the cloud and place-search services.
+Live data: cloud cover from Open-Meteo, Kp forecast and aurora map from NOAA SWPC, satellite orbits from CelesTrak, places from OpenStreetMap via Photon (or Nominatim when Photon is down). No API keys. Everything else is calculated on the device, and your location is only sent, rounded to about 100 m, to the cloud and place-search services.
 
 To run it locally, serve the folder over HTTPS or `localhost` so the browser can ask for your location:
 
