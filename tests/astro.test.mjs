@@ -44,6 +44,8 @@ check("Oslo dark from about 20:15 on 2026-10-20",Math.abs(h*60+m-(20*60+15))<=20
 
 // Aurora: Kp needed matches common experience, and never rises as you go north
 const need=([lat,lon])=>A.kpNeeded(A.magLat(lat,lon));
+// These three are regression checks for the tuned KP_LINE table: they use the same numbers it was
+// tuned to, so they catch accidental changes but are not independent validation of the table.
 check("Oslo needs about Kp 4",need(OSLO)>=3.5&&need(OSLO)<=5,need(OSLO).toFixed(1));
 check("Tromsø needs about Kp 1 or less",need(TROMSO)<=1.5,need(TROMSO).toFixed(1));
 check("New York needs about Kp 7–8",need(NYC)>=7&&need(NYC)<=8.5,need(NYC).toFixed(1));
