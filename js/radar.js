@@ -1,5 +1,6 @@
 /* ---------- Radar scopes ---------- */
-const SWEEP_MS=4000,RG="61,255,168"; // sweep period; radar green as r,g,b for alpha work
+// A real scope: one turn every 5 s, and the phosphor fades to nothing before the beam comes round again
+const SWEEP_MS=5000,PERSIST_MS=1500,RG="61,255,168"; // radar green as r,g,b for alpha work
 const TAU=Math.PI*2,FRAME_MS=33; // ~30 fps is plenty for the sweep and easier on the battery
 const reduceMotion=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Animate a scope only while it's on screen
@@ -17,8 +18,27 @@ function sizeCanvas(cv){
 }
 // Screen angle is clockwise from the top; canvas angles start at 3 o'clock
 const canvasAngle=a=>a-Math.PI/2;
-// Glow left on a blip after the sweep passed it: 1 just swept, fading toward 0
-function afterglow(sweep,ang){if(sweep==null)return 1;const d=((sweep-ang)%TAU+TAU)%TAU;return Math.exp(-d/1.3)}
+// Time since the beam last passed a bearing, in ms
+const sweptAgo=(sweep,ang)=>(((sweep-ang)%TAU+TAU)%TAU)/TAU*SWEEP_MS;
+// Phosphor brightness left at a bearing: 1 just painted, gone well before the next pass.
+// Without motion (reduced-motion setting) everything shows steadily instead.
+function glow(sweep,ang){
+  if(sweep==null)return .8;
+  const g=Math.exp(-sweptAgo(sweep,ang)/PERSIST_MS);
+  return g<.02?0:g;
+}
+// One return: a short arc at the target's range, smeared across the beam width.
+// It flashes white-hot when painted, then settles into green afterglow.
+function drawReturn(ctx,c,x,y,size,g,age){
+  const dx=x-c,dy=y-c,r=Math.hypot(dx,dy),a=Math.atan2(dy,dx),half=1*D2R+size/Math.max(r,20);
+  const hot=age<150?1-age/150:0,col=hot?`${Math.round(61+170*hot)},255,${Math.round(168+80*hot)}`:RG;
+  ctx.lineCap="round";
+  for(const [lw,al] of [[size*2.4,.22],[size,1]]){
+    ctx.lineWidth=lw;ctx.strokeStyle=`rgba(${col},${(g*al).toFixed(3)})`;ctx.beginPath();
+    if(r<4)ctx.arc(x,y,.5,0,TAU);else ctx.arc(c,c,r,a-half,a+half);
+    ctx.stroke();
+  }
+}
 
 // Scope face: background, rings, ticks, cardinal letters and the sweep. Returns the sweep angle or null.
 function drawScope(ctx,w,R,o){
@@ -61,7 +81,7 @@ function drawScope(ctx,w,R,o){
 
 /* ---------- Cosmic Radar ---------- */
 const Radar={
-  filter:"all",blips:[],lines:[],sats:[],trails:{},hits:[],lastSat:0,lastDraw:0,
+  filter:"all",blips:[],lines:[],sats:[],paints:new Map(),lastSweep:null,hits:[],lastSat:0,lastDraw:0,
   init(){
     this.cv=$("radar");watchOnScreen(this,this.cv);
     this.cv.addEventListener("click",e=>this.tap(e));
@@ -103,8 +123,7 @@ const Radar={
     for(const s of Sats.list){
       const p=Sats.look(s,t);if(!p||p.alt<=0)continue;
       const seen=dark&&p.lit&&p.alt>=10;
-      const tr=[];for(let k=1;k<=6;k++){const q=Sats.look(s,t-k*6000);if(q&&q.alt>0)tr.push(q)}
-      out.push({cat:"sat",alt:p.alt,az:p.az,name:s.label||s.name,named:!!s.label,seen,trail:tr,sel:{type:"sat",id:s.id}});
+      out.push({cat:"sat",alt:p.alt,az:p.az,name:s.label||s.name,named:!!s.label,seen,sel:{type:"sat",id:s.id}});
     }
     this.sats=out;
     if(S.sel&&S.sel.type==="sat")updateSatLive();
@@ -128,65 +147,85 @@ const Radar={
     if(still?this.lastDraw:now-this.lastDraw<FRAME_MS)return;
     this.lastDraw=now;this.draw(still?null:now);
   },
+  // Return strength: how big and bright each kind of target paints
+  echo(b){
+    if(b.moon)return [7,1];
+    if(b.cat==="planet")return [5,1];
+    if(b.cat==="sat")return [3,b.seen?1:.45];
+    if(b.cat==="con")return [4,b.pattern?.5:.35];
+    if(b.deep)return [6,.35];
+    return [Math.max(1.6,4.2-.8*b.mag),Math.min(1,.5+.25*(2-b.mag))];
+  },
   draw(now){
     const {ctx,w}=sizeCanvas(this.cv),c=w/2,R=c-6,rot=Compass.heading||0;
     const sweep=drawScope(ctx,w,R,{rot,now,rings:[{r:R*60/90,dash:true,label:"30°"},{r:R*30/90,dash:true,label:"60°"}]});
     const xy=(alt,az)=>{const t=(az-rot)*D2R,r=(90-alt)/90*R;return [c+Math.sin(t)*r,c-Math.cos(t)*r,t]};
-    // constellation lines
-    ctx.lineWidth=1;ctx.strokeStyle=this.filter==="con"?`rgba(${RG},.45)`:"rgba(120,160,190,.22)";
+    // Did the beam cross this bearing since the last frame?
+    const last=this.lastSweep,crossed=ang=>{
+      if(sweep==null||last==null)return false;
+      const span=((sweep-last)%TAU+TAU)%TAU,d=((ang-last)%TAU+TAU)%TAU;
+      return d>0&&d<=span;
+    };
+    this.lastSweep=sweep;
+    ctx.save();ctx.beginPath();ctx.arc(c,c,R,0,TAU);ctx.clip();
+    // constellation outlines glow only as the beam passes
     if(this.filter==="all"||this.filter==="con"){
-      ctx.save();ctx.beginPath();ctx.arc(c,c,R,0,TAU);ctx.clip();ctx.beginPath();
-      for(const l of this.lines){const [x1,y1]=xy(l.a.alt,l.a.az),[x2,y2]=xy(l.b.alt,l.b.az);ctx.moveTo(x1,y1);ctx.lineTo(x2,y2)}
-      ctx.stroke();ctx.restore();
+      ctx.lineWidth=1;
+      for(const l of this.lines){
+        const [x1,y1]=xy(l.a.alt,l.a.az),[x2,y2]=xy(l.b.alt,l.b.az),mx=(x1+x2)/2,my=(y1+y2)/2;
+        const g=glow(sweep,Math.atan2(mx-c,c-my))*(this.filter==="con"?.55:.3);
+        if(g<.01)continue;
+        ctx.strokeStyle=`rgba(${RG},${g.toFixed(3)})`;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+      }
     }
     const all=[...this.blips,...this.sats].filter(b=>this.shown(b));
     const top=new Set(all.filter(b=>b.cat!=="planet"&&b.cat!=="sat"&&b.rank<99).sort((a,b)=>a.rank-b.rank).slice(0,9));
-    this.hits=[];const labels=[];
+    this.hits=[];const labels=[],seenSats=new Set();
     for(const b of all){
-      const [x,y,ang]=xy(b.alt,b.az),gl=afterglow(sweep,ang);
+      const [x,y,ang]=xy(b.alt,b.az),[size,str]=this.echo(b);
       this.hits.push({x,y,b});
-      // satellite trails
-      if(b.cat==="sat"&&b.trail.length){
-        ctx.strokeStyle=`rgba(${RG},${(b.seen?.5:.2)*(.4+.6*gl)})`;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(x,y);
-        for(const q of b.trail){const [tx,ty]=xy(q.alt,q.az);ctx.lineTo(tx,ty)}ctx.stroke();
+      if(b.cat==="sat"){
+        // moving targets: painted where they are when the beam crosses, older paints stay as fading history dots
+        const id=b.sel.id;seenSats.add(id);
+        let hist=this.paints.get(id);if(!hist)this.paints.set(id,hist=[]);
+        if(crossed(ang)){hist.push({x,y,t:now,ang});if(hist.length>4)hist.shift()}
+        hist.forEach((p,i)=>{
+          const age=now-p.t,newest=i===hist.length-1;
+          const g=sweep==null?.8:Math.exp(-age/(newest?PERSIST_MS:8000))*(newest?1:.35);
+          if(g>.02)drawReturn(ctx,c,p.x,p.y,newest?size:1.6,g*str,newest?age:1e9);
+          if(newest&&g>.2&&this.labeled(b,top))labels.push({x:p.x,y:p.y,b,a:g});
+        });
+        if(sweep==null){drawReturn(ctx,c,x,y,size,.8*str,1e9);if(this.labeled(b,top))labels.push({x,y,b,a:.8})}
+        continue;
       }
-      const a=.35+.65*gl;
-      if(b.cat==="planet"){
-        const r=b.moon?7:5;ctx.save();ctx.shadowColor=b.color;ctx.shadowBlur=8*gl+3;ctx.fillStyle=b.color;ctx.globalAlpha=Math.max(.6,a);
-        ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill();ctx.restore();
-      }else if(b.cat==="star"){
-        ctx.globalAlpha=a;
-        if(b.deep){ctx.strokeStyle=b.color;ctx.setLineDash([2,2]);ctx.beginPath();ctx.arc(x,y,4.5,0,TAU);ctx.stroke();ctx.setLineDash([])}
-        else{ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(x,y,Math.max(1,3.6-.7*b.mag),0,TAU);ctx.fill()}
-        ctx.globalAlpha=1;
-      }else if(b.cat==="con"){
-        ctx.strokeStyle=`rgba(${RG},${a})`;ctx.lineWidth=1.3;ctx.beginPath();
-        ctx.moveTo(x,y-5);ctx.lineTo(x+5,y);ctx.lineTo(x,y+5);ctx.lineTo(x-5,y);ctx.closePath();ctx.stroke();
-      }else{
-        ctx.fillStyle=b.seen?`rgba(220,255,240,${a})`:`rgba(${RG},${a*.6})`;ctx.fillRect(x-2.5,y-2.5,5,5);
-      }
-      // ping ring as the sweep crosses
-      if(sweep!=null&&gl>.55){ctx.strokeStyle=`rgba(${RG},${((gl-.55)/.45*.7).toFixed(2)})`;ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,6+(1-gl)*30,0,TAU);ctx.stroke()}
-      if(this.labeled(b,top))labels.push({x,y,b,a:.55+.45*gl});
+      const g=glow(sweep,ang);
+      if(g<=0)continue;
+      drawReturn(ctx,c,x,y,size,g*str,sweep==null?1e9:sweptAgo(sweep,ang));
+      if(g>.2&&this.labeled(b,top))labels.push({x,y,b,a:g});
     }
-    // labels last, skipping ones that would overlap
+    ctx.restore();
+    // forget satellites that have left the sky
+    for(const id of this.paints.keys())if(!seenSats.has(id))this.paints.delete(id);
+    // names light up with their return and fade with it
     ctx.textAlign="left";const placed=[];
     for(const l of labels.sort((p,q)=>(p.b.cat==="planet"?-1:0)-(q.b.cat==="planet"?-1:0)||p.b.rank-q.b.rank)){
       const text=l.b.name,big=l.b.cat==="planet"||l.b.rank<6;
       ctx.font=`${big?"600 12px":"11px"} 'Atkinson Hyperlegible', sans-serif`;
-      const tw=ctx.measureText(text).width,lx=Math.min(l.x+8,w-tw-4),ly=l.y+4;
+      const tw=ctx.measureText(text).width,lx=Math.min(l.x+9,w-tw-4),ly=l.y+4;
       if(placed.some(p=>lx<p.x+p.w&&lx+tw>p.x&&Math.abs(ly-p.y)<12))continue;
       placed.push({x:lx,y:ly,w:tw});
-      ctx.fillStyle=l.b.cat==="planet"?l.b.color:l.b.cat==="con"?`rgba(${RG},${l.a})`:`rgba(216,236,230,${l.a})`;
-      ctx.fillText(text,lx,ly);
+      ctx.fillStyle=`rgba(${RG},${l.a.toFixed(3)})`;ctx.fillText(text,lx,ly);
     }
-    // lock-on brackets around the selected blip
+    // the locked target keeps a steady data tag, like a tracked target on a real scope
     const sel=S.sel&&this.hits.find(h=>h.b.sel.type===S.sel.type&&h.b.sel.id===S.sel.id);
     if(sel){
-      const k=10+(now?Math.sin(now/300)*1.5:0),{x,y}=sel;
+      const k=10,{x,y}=sel;
       ctx.strokeStyle="#ffcf6b";ctx.lineWidth=2;ctx.beginPath();
       for(const [sx,sy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){ctx.moveTo(x+sx*k,y+sy*(k-5));ctx.lineTo(x+sx*k,y+sy*k);ctx.lineTo(x+sx*(k-5),y+sy*k)}
       ctx.stroke();
+      ctx.font="600 12px 'IBM Plex Mono', monospace";
+      const tag=sel.b.name.toUpperCase(),tw=ctx.measureText(tag).width,tx=x+14+tw>w-4?x-14-tw:x+14;
+      ctx.fillStyle="#ffcf6b";ctx.fillText(tag,tx,y-12);
     }
   },
   tap(e){

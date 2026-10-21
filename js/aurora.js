@@ -126,10 +126,13 @@ const Aurora={
       ctx.save();ctx.beginPath();ctx.arc(c,c,R,0,TAU);ctx.clip();ctx.globalCompositeOperation="lighter";
       const cell=Math.max(3,70*k);
       for(const p of this.near){
-        const t=(p.b-rot)*D2R,x=c+Math.sin(t)*p.d*k,y=c-Math.cos(t)*p.d*k,gl=afterglow(sweep,t),v=Math.min(1,p.v/35);
-        ctx.fillStyle=`rgba(90,255,160,${(v*(.25+.75*gl)*.55).toFixed(3)})`;
+        // aurora shows only as the beam paints it, then fades like the rest of the scope
+        const t=(p.b-rot)*D2R,gl=glow(sweep,t);
+        if(gl<=0)continue;
+        const x=c+Math.sin(t)*p.d*k,y=c-Math.cos(t)*p.d*k,v=Math.min(1,p.v/35);
+        ctx.fillStyle=`rgba(${RG},${(v*gl*.6).toFixed(3)})`;
         ctx.beginPath();ctx.arc(x,y,cell,0,TAU);ctx.fill();
-        if(p.v>=40){ctx.fillStyle=`rgba(190,120,255,${(.25*gl).toFixed(3)})`;ctx.beginPath();ctx.arc(x,y,cell*.6,0,TAU);ctx.fill()}
+        if(p.v>=40){ctx.fillStyle=`rgba(210,255,230,${(.35*gl).toFixed(3)})`;ctx.beginPath();ctx.arc(x,y,cell*.6,0,TAU);ctx.fill()}
       }
       ctx.restore();
     }
