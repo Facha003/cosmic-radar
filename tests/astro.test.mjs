@@ -56,6 +56,8 @@ check("Kp needed never rises further north",mono);
 const dark={quality:"full",moonIllum:0,moonUp:0};
 const unknown=A.skyVerdict({...dark,avgCloud:null}).label;
 check("No cloud forecast: not called a great or good night",unknown!=="Great night for stars"&&unknown!=="Good night for stars",unknown);
+const twilight=A.skyVerdict({quality:"nautical",moonIllum:0,moonUp:0,avgCloud:null}).label;
+check("No cloud forecast, never fully dark: not called dark enough",!twilight.includes("Dark enough"),twilight);
 const clear=A.skyVerdict({...dark,avgCloud:0}).label;
 check("Clear, dark, Moon down: great night",clear==="Great night for stars",clear);
 const overcast=A.skyVerdict({...dark,avgCloud:100}).label;

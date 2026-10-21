@@ -129,6 +129,6 @@ function skyVerdict({quality,moonIllum,moonUp,avgCloud}){
   score-=moonIllum*moonUp*45;
   if(avgCloud!=null)score-=avgCloud*0.7;
   const [label,cls]=score>=75?["Great night for stars","st-good"]:score>=55?["Good night for stars","st-good"]:score>=35?["Fair night","st-fair"]:["Poor night","st-poor"];
-  if(avgCloud==null&&score>=55)return {label:"Dark enough, clouds unknown",cls:"st-fair",score};
+  if(avgCloud==null&&score>=55)return {label:quality==="full"?"Dark enough, clouds unknown":"Clouds unknown",cls:"st-fair",score};
   return {label,cls,score};
 }
