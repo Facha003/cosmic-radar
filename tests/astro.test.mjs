@@ -4,7 +4,7 @@ import vm from "node:vm";
 
 const root=new URL("../",import.meta.url);
 const code=["js/data.js","js/astro.js","js/events.js"].map(f=>readFileSync(new URL(f,root),"utf8")).join("\n;\n");
-const A=vm.runInContext(code+"\n;({STARS,CONS,altaz,planetPos,moonPhase,nightWindow,magLat,kpNeeded})",vm.createContext({}));
+const A=vm.runInContext(code+"\n;({STARS,CONS,altaz,planetPos,moonPhase,nightWindow,magLat,kpNeeded,skyVerdict})",vm.createContext({}));
 
 let failed=0;
 function check(name,ok,detail){
@@ -49,6 +49,18 @@ check("Tromsø needs about Kp 1 or less",need(TROMSO)<=1.5,need(TROMSO).toFixed(
 check("New York needs about Kp 7–8",need(NYC)>=7&&need(NYC)<=8.5,need(NYC).toFixed(1));
 let mono=true;for(let ml=40;ml<75;ml+=.5)if(A.kpNeeded(ml+.5)>A.kpNeeded(ml)+1e-9)mono=false;
 check("Kp needed never rises further north",mono);
+
+// Tonight's verdict: never promise a good night without a cloud forecast
+const dark={quality:"full",moonIllum:0,moonUp:0};
+const unknown=A.skyVerdict({...dark,avgCloud:null}).label;
+check("No cloud forecast: not called a great or good night",unknown!=="Great night for stars"&&unknown!=="Good night for stars",unknown);
+const clear=A.skyVerdict({...dark,avgCloud:0}).label;
+check("Clear, dark, Moon down: great night",clear==="Great night for stars",clear);
+const overcast=A.skyVerdict({...dark,avgCloud:100}).label;
+check("Overcast, dark, Moon down: poor or fair night",overcast==="Poor night"||overcast==="Fair night",overcast);
+const RANK=["Great night for stars","Good night for stars","Fair night","Poor night"];
+const moonlit=A.skyVerdict({quality:"full",moonIllum:1,moonUp:1,avgCloud:0}).label;
+check("Bright Moon up all night is worse than the Moon down",RANK.indexOf(moonlit)>RANK.indexOf(clear),`${moonlit} vs ${clear}`);
 
 console.log(failed?`\n${failed} check(s) failed`:"\nAll checks passed");
 process.exit(failed?1:0);
