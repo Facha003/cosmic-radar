@@ -74,14 +74,15 @@ const Aurora={
     let pct=best.sc;
     const now=Date.now();
     if(this.seeNow&&now>=w.dusk&&now<=w.dawn){const h=S.wx&&S.wx.find(x=>Math.abs(x.t-now)<1800e3);pct=Math.max(pct,Math.min(1,this.seeNow/25)*(h?1-.9*h.c/100:.75))}
-    return {pct:Math.round(pct*100),best:best.b,need,ml,kpMax:Math.max(...blocks.map(b=>b.kp))};
+    return {pct:Math.round(pct*100),best:best.b,need,ml,kpMax:Math.max(...blocks.map(b=>b.kp)),storm:topStorm(blocks)};
   },
   render(){
     if(!this.open||!S.win)return;
     this.prep();
     const ch=this.chance(),hm=hemi(),w=S.win;
     // headline
-    if(!ch){$("aChance").textContent="–";$("aLbl").textContent=S.kpRows===null?"The aurora forecast couldn't load":"Checking the forecast…";$("aBest").textContent=""}
+    $("aIntro").textContent=`Estimate your chances of seeing the ${hm.name} lights. Aurora forecast, cloud cover, darkness and nearby places to watch from.`;
+    if(!ch){$("aChance").textContent="–";$("aLbl").textContent=S.kpRows===null?"NOAA's Kp forecast couldn't load":"Checking the forecast…";$("aBest").textContent=""}
     else{
       const p=ch.pct;
       $("aChance").textContent=`${p}%`;
@@ -94,7 +95,8 @@ const Aurora={
     const rows=[];
     if(ch){
       const st=ch.kpMax>=ch.need+1?"good":ch.kpMax>=ch.need-1?"fair":"poor";
-      rows.push({name:"Aurora activity",st,text:`Up to Kp ${ch.kpMax.toFixed(1)} tonight. About ${Math.min(9,ch.need).toFixed(1)} is needed here.`,meter:ch.kpMax/9,mark:Math.min(1,ch.need/9)});
+      const storm=stormText(ch.storm);
+      rows.push({name:"Geomagnetic activity",st,text:`Up to Kp ${ch.kpMax.toFixed(1)} tonight${storm?`, ${storm}`:""}. About Kp ${Math.min(9,ch.need).toFixed(1)} is needed here.`,meter:ch.kpMax/9,mark:Math.min(1,ch.need/9)});
     }
     const dk=S.wx?S.wx.filter(h=>h.t>=w.dusk&&h.t<=w.dawn):[];
     if(dk.length){
@@ -109,7 +111,7 @@ const Aurora={
       <p class="fText">${esc(r.text)}</p>${r.meter!=null?`<div class="meter" aria-hidden="true"><span style="width:${Math.round(Math.max(.02,Math.min(1,r.meter))*100)}%"></span>${r.mark!=null?`<i style="left:${Math.round(r.mark*100)}%"></i>`:""}</div>`:""}</li>`).join("");
     // radar caption
     $("aRadarNote").textContent=!this.ov?(this.ovAt?"NOAA's aurora map couldn't load right now.":"Loading NOAA's aurora map…")
-      :(Compass.heading!=null?"The top is the way your phone points. ":"")+`Green is where aurora is likely overhead (NOAA, ${fmt(this.ovTime)}). Inside the bright ring it can show low on your ${hm.dir}ern horizon.`+(this.near&&!this.near.some(p=>p.d<=RANGE_KM&&p.v>=10)?" None within range right now.":"");
+      :(Compass.heading!=null?"The top is the way your phone points. ":"")+`Green shows NOAA's chance of aurora overhead, forecast for ${fmt(this.ovTime)}; brighter means more likely. Inside the bright ring it can show low on your ${hm.dir}ern horizon.`+(this.near&&!this.near.some(p=>p.d<=RANGE_KM&&p.v>=10)?" No aurora above a 10% chance within range right now.":"");
     this.renderKp(ch);this.renderSpots();this.lastDraw=0;
   },
   frame(now){
@@ -143,7 +145,7 @@ const Aurora={
   // Kp forecast in 3-hour blocks, with the level needed here
   renderKp(ch){
     const el=$("kpChart");
-    if(!S.kpRows){el.innerHTML="";$("kpReadout").textContent=S.kpRows===null?"The aurora forecast couldn't load.":"";return}
+    if(!S.kpRows){el.innerHTML="";$("kpReadout").textContent=S.kpRows===null?"NOAA's Kp forecast couldn't load.":"";return}
     const rows=S.kpRows.filter(o=>o.t+3*3600e3>Date.now()-3*3600e3).slice(0,24);
     if(!rows.length){el.innerHTML="";return}
     const need=ch?ch.need:kpNeeded(magLat(S.lat,S.lon)),W=340,H=160,L=22,B=24,T=12,bw=(W-L-2)/rows.length;
@@ -161,12 +163,13 @@ const Aurora={
     if(need<=9)g+=`<line x1="${L}" x2="${W}" y1="${ny}" y2="${ny}" stroke="var(--fg)" stroke-dasharray="4 4" opacity=".7"/><text x="${W-2}" y="${ny-5}" text-anchor="end" class="axb">needed here ≈ ${need.toFixed(1)}</text>`;
     const ni=rows.findIndex(r=>Date.now()>=r.t&&Date.now()<r.t+3*3600e3);
     if(ni>=0){const nx=L+(ni+(Date.now()-rows[ni].t)/(3*3600e3))*bw;g+=`<line x1="${nx}" x2="${nx}" y1="${T-6}" y2="${y(0)}" stroke="#ffcf6b" stroke-width="1.5"/><text x="${nx+3}" y="${T-1}" class="axb">now</text>`}
-    el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kp forecast for the next three days">${g}</svg>`;
-    const def="Kp measures how stirred up Earth's magnetic field is, from 0 to 9. Tap a bar for its time.";
+    el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kp index in 3-hour blocks: recent measurements and NOAA's forecast">${g}</svg>`;
+    const def="Kp measures how disturbed Earth's magnetic field is, from 0 to 9. Faded bars are past. Tap a bar for details.";
     $("kpReadout").textContent=def;
+    const KIND={observed:"measured",estimated:"estimated",predicted:"forecast"};
     el.querySelectorAll("rect[data-i]").forEach(b=>b.addEventListener("click",()=>{
-      const r=rows[+b.dataset.i];
-      $("kpReadout").textContent=`${new Intl.DateTimeFormat(undefined,{weekday:"long",timeZone:S.tz}).format(new Date(r.t))} ${fmt(r.t)}–${fmt(r.t+3*3600e3)}: Kp ${r.kp.toFixed(1)}${r.kp>=need?", enough for a chance here":""}.`;
+      const r=rows[+b.dataset.i],storm=stormText(r.g);
+      $("kpReadout").textContent=`${new Intl.DateTimeFormat(undefined,{weekday:"long",timeZone:S.tz}).format(new Date(r.t))} ${fmt(r.t)}–${fmt(r.t+3*3600e3)}: Kp ${r.kp.toFixed(1)}${KIND[r.kind]?` (${KIND[r.kind]})`:""}${storm?`, ${storm}`:""}${r.kp>=need?", enough for a chance here":""}.`;
     }));
   },
   // Named dark places nearby from OpenStreetMap, best first

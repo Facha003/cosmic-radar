@@ -11,15 +11,21 @@ function kpNeeded(ml){
   return 0;
 }
 
-// NOAA's 3-hour Kp forecast (0–9 scale of geomagnetic activity)
+// NOAA geomagnetic storm scale, as NOAA marks it on each Kp block
+const G_NAME={G1:"minor",G2:"moderate",G3:"strong",G4:"severe",G5:"extreme"};
+const stormText=g=>g?`a ${g}${G_NAME[g]?` (${G_NAME[g]})`:""} geomagnetic storm`:"";
+const topStorm=rows=>rows.map(o=>o.g).filter(Boolean).sort().pop()||null;
+
+// NOAA's 3-hour planetary K-index (Kp): 0–9 scale of how disturbed Earth's magnetic field is
 async function loadAurora(){
   try{
     const r=await fetch("https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json");
     if(!r.ok)throw new Error(r.status);
     const j=await r.json();
     // Rows are objects now; older responses were arrays with a header row
-    const rows=Array.isArray(j[0])?j.slice(1).map(a=>({time_tag:a[0],kp:a[1]})):j;
-    S.kpRows=rows.map(o=>({t:Date.parse(String(o.time_tag).replace(" ","T")+"Z"),kp:+o.kp})).filter(o=>!isNaN(o.t)&&!isNaN(o.kp));
+    const rows=Array.isArray(j[0])?j.slice(1).map(a=>({time_tag:a[0],kp:a[1],observed:a[2],noaa_scale:a[3]})):j;
+    // kind: NOAA's "observed", "estimated" or "predicted"; g: NOAA's storm level (G1–G5) for that block, if any
+    S.kpRows=rows.map(o=>({t:Date.parse(String(o.time_tag).replace(" ","T")+"Z"),kp:+o.kp,kind:o.observed||"",g:o.noaa_scale||null})).filter(o=>!isNaN(o.t)&&!isNaN(o.kp));
   }catch(e){S.kpRows=null}
   renderSpecial();Aurora.render();
 }
@@ -43,11 +49,12 @@ function computeEvents(){
   if(S.kpRows){
     const rows=S.kpRows.filter(o=>o.t+3*3600e3>w.dusk&&o.t<w.dawn);
     if(rows.length){
-      const kp=Math.max(...rows.map(o=>o.kp)),ml=magLat(S.lat,S.lon),need=kpNeeded(ml);
+      const kp=Math.max(...rows.map(o=>o.kp)),ml=magLat(S.lat,S.lon),need=kpNeeded(ml),storm=stormText(topStorm(rows));
       const name=S.lat>=0?"Northern":"Southern",hor=S.lat>=0?"north":"south";
-      if(kp>=need+1)ev.push({strong:true,tab:"aur",title:`${name} lights likely tonight`,text:`Strong activity (Kp ${kp.toFixed(1)} of 9). From a dark spot, look ${hor}. Phone cameras often show it better than your eyes.`});
-      else if(kp>=need)ev.push({strong:true,tab:"aur",title:`${name} lights possible tonight`,text:`Activity Kp ${kp.toFixed(1)} of 9 is about what's needed here. Look low toward the ${hor} from a dark spot.`});
-      else if(Math.abs(ml)>=45)ev.push({tab:"aur",title:`${name} lights unlikely tonight`,text:`Activity Kp ${kp.toFixed(1)} of 9. You'd need about ${need.toFixed(1)} here.`});
+      const act=`Geomagnetic activity up to Kp ${kp.toFixed(1)} of 9${storm?`, ${storm}`:""}`;
+      if(kp>=need+1)ev.push({strong:true,tab:"aur",title:`${name} lights likely tonight`,text:`${act}. From a dark spot, look ${hor}. Phone cameras often show it better than your eyes.`});
+      else if(kp>=need)ev.push({strong:true,tab:"aur",title:`${name} lights possible tonight`,text:`${act}, about what's needed here. Look low toward the ${hor} from a dark spot.`});
+      else if(Math.abs(ml)>=45)ev.push({tab:"aur",title:`${name} lights unlikely tonight`,text:`${act}. You'd need about Kp ${need.toFixed(1)} here.`});
     }
   }
 
