@@ -87,7 +87,8 @@ const Aurora={
       $("aChance").textContent=`${p}%`;
       $("aChance").dataset.level=p>=45?"high":p>=15?"mid":"low";
       $("aLbl").textContent=ch.need>9?`Too far from the poles: the ${hm.name} lights are very rare here`:p>=70?`High chance of ${hm.name} lights tonight`:p>=45?`Good chance of ${hm.name} lights tonight`:p>=15?`Some chance of ${hm.name} lights tonight`:p>=5?"Low chance tonight":"Very unlikely tonight";
-      $("aBest").textContent=p>=5?`Best around ${fmt(Math.max(ch.best.t,w.sunset))}–${fmt(Math.min(ch.best.t+3*3600e3,w.sunrise))}. Look ${hm.dir}.`:"Activity can jump with little warning, so check back later.";
+      $("aBest").textContent=(p>=5?`Best around ${fmt(Math.max(ch.best.t,w.sunset))}–${fmt(Math.min(ch.best.t+3*3600e3,w.sunrise))}. Look ${hm.dir}.`:"Activity can jump with little warning, so check back later.")
+        +(S.wx?"":" Cloud forecast unavailable, so this assumes partly clear skies.");
     }
     // the three things that decide it
     const rows=[];
