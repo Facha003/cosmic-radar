@@ -208,10 +208,16 @@ const Radar={
     for(const id of this.paints.keys())if(!seenSats.has(id))this.paints.delete(id);
     // names light up with their return and fade with it
     ctx.textAlign="left";const placed=[];
+    // keep names inside the scope (within R-8 of the center) and off the N/E/S/W letters, which sit at R-22
+    const inside=(x0,y0,x1,y1)=>[[x0,y0],[x1,y0],[x0,y1],[x1,y1]].every(([x,y])=>Math.hypot(x-c,y-c)<=R-8);
+    const letters=[0,90,180,270].map(a=>{const t=(a-rot)*D2R;return [c+Math.sin(t)*(R-22),c-Math.cos(t)*(R-22)]});
     for(const l of labels.sort((p,q)=>(p.b.cat==="planet"?-1:0)-(q.b.cat==="planet"?-1:0)||p.b.rank-q.b.rank)){
       const text=l.b.name,big=l.b.cat==="planet"||l.b.rank<6;
       ctx.font=`${big?"600 12px":"11px"} 'Atkinson Hyperlegible', sans-serif`;
-      const tw=ctx.measureText(text).width,lx=Math.min(l.x+9,w-tw-4),ly=l.y+4;
+      const tw=ctx.measureText(text).width,ly=l.y+4;
+      let lx=l.x+9;
+      if(!inside(lx,ly-10,lx+tw,ly+3)){lx=l.x-9-tw;if(!inside(lx,ly-10,lx+tw,ly+3))continue}
+      if(letters.some(([x,y])=>lx<x+11&&lx+tw>x-11&&ly-10<y+11&&ly+3>y-11))continue;
       if(placed.some(p=>lx<p.x+p.w&&lx+tw>p.x&&Math.abs(ly-p.y)<12))continue;
       placed.push({x:lx,y:ly,w:tw});
       ctx.fillStyle=`rgba(${RG},${l.a.toFixed(3)})`;ctx.fillText(text,lx,ly);
