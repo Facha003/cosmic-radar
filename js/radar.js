@@ -212,13 +212,20 @@ const Radar={
     const inside=(x0,y0,x1,y1)=>[[x0,y0],[x1,y0],[x0,y1],[x1,y1]].every(([x,y])=>Math.hypot(x-c,y-c)<=R-8);
     const letters=[0,90,180,270].map(a=>{const t=(a-rot)*D2R;return [c+Math.sin(t)*(R-22),c-Math.cos(t)*(R-22)]});
     for(const l of labels.sort((p,q)=>(p.b.cat==="planet"?-1:0)-(q.b.cat==="planet"?-1:0)||p.b.rank-q.b.rank)){
-      const text=l.b.name,big=l.b.cat==="planet"||l.b.rank<6;
+      const text=l.b.name,big=l.b.cat==="planet"||l.b.rank<6,planet=l.b.cat==="planet";
       ctx.font=`${big?"600 12px":"11px"} 'Atkinson Hyperlegible', sans-serif`;
-      const tw=ctx.measureText(text).width,ly=l.y+4;
-      let lx=l.x+9;
-      if(!inside(lx,ly-10,lx+tw,ly+3)){lx=l.x-9-tw;if(!inside(lx,ly-10,lx+tw,ly+3))continue}
-      if(letters.some(([x,y])=>lx<x+11&&lx+tw>x-11&&ly-10<y+11&&ly+3>y-11))continue;
-      if(placed.some(p=>lx<p.x+p.w&&lx+tw>p.x&&Math.abs(ly-p.y)<12))continue;
+      const tw=ctx.measureText(text).width;
+      const onLetter=(lx,ly)=>letters.some(([x,y])=>lx<x+11&&lx+tw>x-11&&ly-10<y+11&&ly+3>y-11);
+      const onLabel=(lx,ly)=>placed.some(p=>lx<p.x+p.w&&lx+tw>p.x&&Math.abs(ly-p.y)<12);
+      // try right, left, centered above (toward the center), then centered below
+      const spots=[[l.x+9,l.y+4],[l.x-9-tw,l.y+4],[l.x-tw/2,l.y-9],[l.x-tw/2,l.y+17]];
+      let spot=spots.find(([lx,ly])=>inside(lx,ly-10,lx+tw,ly+3)&&(planet||!onLetter(lx,ly))&&!onLabel(lx,ly));
+      if(!spot){
+        if(!planet)continue;
+        // planets and the Moon always keep their name: centered on the side toward the middle, kept on the canvas
+        spot=[Math.min(Math.max(2,l.x-tw/2),w-tw-2),Math.min(Math.max(12,l.y>c?l.y-9:l.y+17),w-4)];
+      }
+      const [lx,ly]=spot;
       placed.push({x:lx,y:ly,w:tw});
       ctx.fillStyle=`rgba(${RG},${l.a.toFixed(3)})`;ctx.fillText(text,lx,ly);
     }
