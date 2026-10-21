@@ -98,7 +98,9 @@ function computeNight(){
   for(let t=w.sunset;t<=w.sunrise;t+=10*60000){const a=moonAltAz(t,S.lat,S.lon).alt;if(t>=w.dusk&&t<=w.dawn){n++;if(a>0)upCount++}if(prev!==null){if(prev<=0&&a>0&&!rise)rise=t;if(prev>0&&a<=0&&!set)set=t}prev=a}
   Object.assign(S,{phase:ph,moonUp:n?upCount/n:0,moonRise:rise,moonSet:set,t:nowOrDusk(),live:true});
   const day=new Intl.DateTimeFormat(undefined,{weekday:"long",month:"long",day:"numeric",timeZone:S.tz}).format(new Date(w.dusk));
-  $("where").textContent=`${S.label} · ${day}`;
+  // say which zone the times are in when it isn't the phone's own
+  const zone=S.tz!==browserTz?(new Intl.DateTimeFormat(undefined,{timeZone:S.tz,timeZoneName:"short"}).formatToParts(new Date(w.dusk)).find(p=>p.type==="timeZoneName")||{}).value:null;
+  $("where").textContent=`${S.label} · ${day}`+(zone?` · times in ${zone}`:"");
   renderAll();
 }
 function renderAll(){
@@ -124,16 +126,24 @@ function renderConditions(){
   bits.push(avg==null?"Cloud forecast unavailable":avg<15?"Clear":avg<40?"Mostly clear":avg<70?"Partly cloudy":"Cloudy");
   $("verdict").innerHTML=`<span class="pill ${cls}">${label}</span> <span>${esc(bits.join(" · "))}</span>`;
 }
+const validTz=z=>{try{new Intl.DateTimeFormat("en-US",{timeZone:z});return z}catch(e){return null}};
 async function loadWeather(){
   S.wx=null;
-  const ctrl=new AbortController(),to=setTimeout(()=>ctrl.abort(),7000);
+  const at=`${S.lat},${S.lon}`,ctrl=new AbortController(),to=setTimeout(()=>ctrl.abort(),7000);
+  let tz=null;
   try{
-    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${S.lat.toFixed(3)}&longitude=${S.lon.toFixed(3)}&hourly=cloud_cover&timezone=UTC&forecast_days=3`,{signal:ctrl.signal});
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${S.lat.toFixed(3)}&longitude=${S.lon.toFixed(3)}&hourly=cloud_cover&timezone=auto&timeformat=unixtime&forecast_days=3`,{signal:ctrl.signal});
     if(!r.ok)throw new Error(r.status);
     const j=await r.json();
-    S.wx=j.hourly.time.map((t,i)=>({t:Date.parse(t+"Z"),c:j.hourly.cloud_cover[i]})).filter(h=>h.c!=null);
-  }catch(e){S.wx=null}
-  clearTimeout(to);renderConditions();Aurora.render();
+    if(at!==`${S.lat},${S.lon}`)return; // the location changed while this was loading
+    S.wx=j.hourly.time.map((t,i)=>({t:t*1000,c:j.hourly.cloud_cover[i]})).filter(h=>h.c!=null);
+    tz=validTz(j.timezone);
+  }catch(e){if(at!==`${S.lat},${S.lon}`)return;S.wx=null}
+  finally{clearTimeout(to)}
+  // The forecast also names the place's own time zone. Use it, so typed-in coordinates (or a phone set to
+  // another zone) still get times, and "tonight", local to the place rather than to the phone.
+  if(tz&&tz!==S.tz){S.tz=tz;store.set("sky-loc",{lat:S.lat,lon:S.lon,tz,label:S.label});computeNight()}
+  else{renderConditions();Aurora.render()}
 }
 
 /* quick picks under the radar: famous things up now */

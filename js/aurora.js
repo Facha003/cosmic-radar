@@ -152,11 +152,14 @@ const Aurora={
     const y=v=>T+(H-T-B)*(1-Math.min(9,v)/9);
     let g="";
     for(const v of [0,3,6,9])g+=`<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-6}" y="${y(v)+3.5}" text-anchor="end" class="ax">${v}</text>`;
+    let prevDay=null;
     rows.forEach((r,i)=>{
       const x=L+i*bw+1,top=y(Math.max(r.kp,.25)),h=y(0)-top,hit=r.kp>=need,rad=Math.min(3,(bw-2)/2,h);
       g+=`<path d="M${x} ${y(0)}V${top+rad}q0 -${rad} ${rad} -${rad}h${bw-2-2*rad}q${rad} 0 ${rad} ${rad}V${y(0)}Z" fill="${hit?"var(--radar)":"var(--bar)"}" opacity="${r.t+3*3600e3<Date.now()?.55:1}"/>`;
-      const hr=new Date(r.t).toLocaleString("en-US",{hour:"numeric",hour12:false,timeZone:S.tz});
-      if(i===0||+hr<3)g+=`<text x="${x}" y="${H-8}" class="ax">${new Intl.DateTimeFormat(undefined,{weekday:"short",timeZone:S.tz}).format(new Date(r.t))}</text>`;
+      // name the day under the first block of each local date (hour12:false can say "24" at midnight, so compare dates)
+      const day=localYMD(r.t).join("-");
+      if(day!==prevDay)g+=`<text x="${x}" y="${H-8}" class="ax">${new Intl.DateTimeFormat(undefined,{weekday:"short",timeZone:S.tz}).format(new Date(r.t))}</text>`;
+      prevDay=day;
       g+=`<rect x="${L+i*bw}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent" data-i="${i}"><title>${fmt(r.t)}: Kp ${r.kp.toFixed(1)}</title></rect>`;
     });
     const ny=y(Math.min(9,need));
