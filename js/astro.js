@@ -119,3 +119,16 @@ function sep(ra1,dec1,ra2,dec2){
   const a=dec1*D2R,b=dec2*D2R;
   return Math.acos(Math.min(1,Math.sin(a)*Math.sin(b)+Math.cos(a)*Math.cos(b)*Math.cos((ra1-ra2)*D2R)))*R2D;
 }
+
+/* ---------- Tonight's verdict ---------- */
+// Scores the night from darkness, the Moon and cloud cover (avgCloud: % during dark hours, or null if unknown).
+// Without a cloud forecast it never promises a good night.
+function skyVerdict({quality,moonIllum,moonUp,avgCloud}){
+  let score=100;
+  if(quality!=="full")score-=quality==="nautical"?20:40;
+  score-=moonIllum*moonUp*45;
+  if(avgCloud!=null)score-=avgCloud*0.7;
+  const [label,cls]=score>=75?["Great night for stars","st-good"]:score>=55?["Good night for stars","st-good"]:score>=35?["Fair night","st-fair"]:["Poor night","st-poor"];
+  if(avgCloud==null&&score>=55)return {label:"Dark enough, clouds unknown",cls:"st-fair",score};
+  return {label,cls,score};
+}

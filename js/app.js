@@ -117,16 +117,12 @@ function whenLabel(){
 function renderConditions(){
   const w=S.win;let avg=null;
   if(S.wx){const dark=S.wx.filter(h=>h.t>=w.dusk&&h.t<=w.dawn);avg=dark.length?dark.reduce((a,h)=>a+h.c,0)/dark.length:null}
-  let score=100;
-  if(w.quality!=="full")score-=w.quality==="nautical"?20:40;
-  score-=S.phase.illum*S.moonUp*45;
-  if(avg!=null)score-=avg*0.7;
-  const [lbl,cls]=score>=75?["Great night for stars","st-good"]:score>=55?["Good night for stars","st-good"]:score>=35?["Fair night","st-fair"]:["Poor night","st-poor"];
+  const {label,cls}=skyVerdict({quality:w.quality,moonIllum:S.phase.illum,moonUp:S.moonUp,avgCloud:avg});
   const bits=[w.quality==="full"?`Dark ${fmt(w.dusk)}–${fmt(w.dawn)}`:"Never fully dark tonight"];
   const ms=S.moonUp<.05?"down all night":S.moonSet&&(!S.moonRise||S.moonSet<S.moonRise)?`sets ${fmt(S.moonSet)}`:S.moonRise?`rises ${fmt(S.moonRise)}`:"up all night";
   bits.push(`Moon ${Math.round(S.phase.illum*100)}%, ${ms}`);
-  if(avg!=null)bits.push(avg<15?"Clear":avg<40?"Mostly clear":avg<70?"Partly cloudy":"Cloudy");
-  $("verdict").innerHTML=`<span class="pill ${cls}">${lbl}</span> <span>${esc(bits.join(" · "))}</span>`;
+  bits.push(avg==null?"Cloud forecast unavailable":avg<15?"Clear":avg<40?"Mostly clear":avg<70?"Partly cloudy":"Cloudy");
+  $("verdict").innerHTML=`<span class="pill ${cls}">${label}</span> <span>${esc(bits.join(" · "))}</span>`;
 }
 async function loadWeather(){
   S.wx=null;
