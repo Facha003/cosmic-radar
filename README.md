@@ -1,18 +1,18 @@
 # Cosmic Radar
 
-A sky app built for phones, with two radars. Live at https://facha003.github.io/cosmic-radar/
+A sky app built for phones, with two radars, made as a group project. Live at https://facha003.github.io/cosmic-radar/
 
 **Cosmic Radar** scans the sky above you for planets, stars, constellations and satellites. Tap a blip to see what it is, how far away it is, whether it's visible tonight and which way to face. On a phone, the radar turns with you like a compass.
 
 **Aurora Radar** estimates your chance of seeing the northern (or southern) lights from the NOAA aurora forecast, cloud cover, darkness and the Moon, and suggests nearby places to watch from.
 
-## Why I built it
+## Why we built it
 
-Star maps show you the whole sky, but they don't tell you where to actually look. I wanted something that works like a radar or sonar: you stand outside, hold up your phone, and it points you to the thing you want to see.
+Star maps show you the whole sky, but they don't tell you where to actually look. We wanted something that works like a radar or sonar: you stand outside, hold up your phone, and it points you to the thing you want to see.
 
-## How I built it with AI
+## How we built it with AI
 
-I built the whole app with Claude Code on my Mac. I described what I wanted in plain language, tested each version on my phone, and asked for changes. Commits made with AI help have a `Co-Authored-By` line.
+We built the whole app as a group with Claude Code. We described what we wanted in plain language, tested each version on our phones, and asked for changes. Commits made with AI help have a `Co-Authored-By` line.
 
 ### How the idea changed
 
@@ -28,15 +28,15 @@ I built the whole app with Claude Code on my Mac. I described what I wanted in p
 
 ### Problems along the way
 
-- **Location blocked inside claude.ai.** Claude Code also published a copy as a claude.ai artifact, but browsers block location access inside it. I moved the real app to GitHub Pages, and the claude.ai copy now links there.
-- **Overconfident sky verdict.** When the cloud forecast failed to load, the app still said "Great night for stars". Missing data should never give an optimistic answer, especially in Oslo in October. I moved the scoring into its own function (`skyVerdict` in `js/astro.js`) so it could be tested, and now it says "Dark enough, clouds unknown" instead. The Aurora Radar also says when it's guessing the clouds.
-- **A fix that broke something else.** Radar labels were running over the edge of the scope, so I had the AI keep them inside. That fix hid the names of planets close to the horizon: near the north or south edge, a planet had to be about 13° up before its name showed. From Oslo, planets are often low in the south, so that hid the most useful labels. I fixed it so labels try four positions, and planets and the Moon always keep their name. I checked it by rendering test planets 1 to 3° above the horizon at the north and south edges.
+- **Location blocked inside claude.ai.** Claude Code also published a copy as a claude.ai artifact, but browsers block location access inside it. We moved the real app to GitHub Pages, and the claude.ai copy now links there.
+- **Overconfident sky verdict.** When the cloud forecast failed to load, the app still said "Great night for stars". Missing data should never give an optimistic answer, especially in Oslo in October. We moved the scoring into its own function (`skyVerdict` in `js/astro.js`) so it could be tested, and now it says "Dark enough, clouds unknown" instead. The Aurora Radar also says when it's guessing the clouds.
+- **A fix that broke something else.** Radar labels were running over the edge of the scope, so we had the AI keep them inside. That fix hid the names of planets close to the horizon: near the north or south edge, a planet had to be about 13° up before its name showed. From Oslo, planets are often low in the south, so that hid the most useful labels. We fixed it so labels try four positions, and planets and the Moon always keep their name. We checked it by rendering test planets 1 to 3° above the horizon at the north and south edges.
 - **Tests that check themselves.** The aurora Kp thresholds (Oslo about 4, Tromsø about 1) were tuned by hand, and the tests check those same numbers. They're labelled as regression checks in the test file, not real validation.
 
-## How I tested it
+## How we tested it
 
 - **Automated:** `tests/astro.test.mjs` checks the astronomy math against real sky events: Saturn and Jupiter at opposition, Venus passing the Sun, the full Moon on 26 Oct 2026, Polaris altitude matching latitude in Oslo, New York and Sydney, and when Oslo gets dark. It also checks the sky verdict, including the missing forecast case. Runs on every push.
-- **Outside at night:** tested on my phone outside in the Oslo area.
+- **Outside at night:** tested on our phones outside in the Oslo area.
 - **Without internet:** loaded the app, turned on airplane mode, and it showed "couldn't load" messages and a retry button instead of crashing.
 
 ```
@@ -46,7 +46,7 @@ node tests/astro.test.mjs
 ## Limits
 
 - Positions use simplified formulas, accurate to around a degree. Fine for the naked eye, not for telescopes.
-- The aurora percentage is my own estimate, not an official forecast.
+- The aurora percentage is our own estimate, not an official forecast.
 - The compass only works on phones and depends on the phone's sensor calibration.
 
 ## Files
